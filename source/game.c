@@ -425,6 +425,9 @@ static void save_game(const char *room, const char *gate) {
       fprintf(f, "Z %s\n", zb); }
     if (hasShade) fprintf(f, "S %s %.2f %.2f %d\n", shadeRoom, shadeX, shadeY, shadeGeo);
     pd_save(f);
+    // the Mantis Claw and Monarch Wings live in the hero (pd.c's mapped bools), not in PlayerData's table that pd_save
+    // writes: up to v1.1.0 nothing saved them, so quitting lost both (the dash has its own place in the header line)
+    fprintf(f, "B hasWalljump %d\nB hasDoubleJump %d\n", P.hasWalljump ? 1 : 0, P.hasDoubleJump ? 1 : 0);
     for (int i = 0; i < nvisited; i++) fprintf(f, "%s\n", visited[i]);
     fclose(f);
 }
@@ -741,6 +744,10 @@ bool game_continue(void) {
     }
     fclose(f);
     pd_set_bool("disablePause", false);     // a save made mid-cutscene or mid-hit never loads with pausing blocked
+    // saves from v1.1.0 and before lost the Mantis Claw and Monarch Wings (see save_game), while their pickups stay taken:
+    // a save whose pickup is gone has the ability (the only pickup in Fungus2_14 is the claw's, in Abyss_21 the wings')
+    if (!P.hasWalljump && pd_any_set("pbi:Fungus2_14:Shiny")) { P.hasWalljump = true; hk_log("save: Mantis Claw restored"); }
+    if (!P.hasDoubleJump && pd_any_set("pbi:Abyss_21:Shiny")) { P.hasDoubleJump = true; hk_log("save: Monarch Wings restored"); }
     // up to v1.0.22 GameManager.CountJournalEntries did nothing, so the Hunter took any Journal as complete and gave his
     // Mark early. With the Mark his hut's floor stays open over a pit that only the Mantis Claw climbs out of: take back
     // a Mark given that way (the Hunter gives it again when the Journal really is complete, the test his talk makes)

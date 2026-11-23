@@ -12,3 +12,4 @@ void pd_set_str(const char *name, const char *v);
 void pd_save(FILE *f);
 bool pd_load_line(const char *line);
 void pd_clear_prefix(const char *prefix);   // GameManager.ResetSemiPersistentObjects uses "pbs:"
+bool pd_any_set(const char *prefix);         // any bool set whose name starts with prefix

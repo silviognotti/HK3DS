@@ -117,6 +117,11 @@ bool pd_load_line(const char *line) {
     if (t == 'B') pd_set_bool(n, v != 0); else pd_set_int(n, v);
     return true;
 }
+bool pd_any_set(const char *pre) {
+    size_t l = strlen(pre);
+    for (int i = 0; i < ntab; i++) if (tab[i].isBool && tab[i].v && !strncmp(tab[i].name, pre, l)) return true;
+    return false;
+}
 void pd_clear_prefix(const char *pre) {
     size_t l = strlen(pre); int j = 0;
     for (int i = 0; i < ntab; i++) if (strncmp(tab[i].name, pre, l)) tab[j++] = tab[i];
