@@ -53,10 +53,15 @@ def entry_fields(path):
 def sprite_lookup():
     by = pickle.load(open(f'{HK}/tex2sprites.pkl', 'rb'))
     match = pickle.load(open(f'{HK}/hs_texmatch.pkl', 'rb'))
+    # AssetRipper 2 exports the Bestiary atlases into ex/Texture2D with a .meta, so the texture dump has no match for
+    # them (issue #6: all 170 icons were missing)
+    tp = f'{HK}/meta_Texture2D.pkl'
+    tex = pickle.load(open(tp, 'rb')) if os.path.exists(tp) else {}
     out = {}
     for tg, L in by.items():
         for name, rect, sg in L:
-            if tg in match and rect: out[sg] = (match[tg], rect, name)
+            src = match.get(tg) or tex.get(tg)
+            if src and rect: out[sg] = (src, rect, name)
     return out
 
 

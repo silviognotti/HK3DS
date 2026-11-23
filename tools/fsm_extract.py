@@ -189,13 +189,18 @@ def decode_actions(ad, P):
 _TEMPLATES = None
 _TEMPLATE_FSM = {}
 def template_fsm(guid):
-    """The FSM of a PlayMaker template asset (data/fsm_templates.json maps the guid; tools/fsm_templates.py)."""
+    """The FSM of a PlayMaker template asset (fsm_templates.json maps the guid: fsm_templates.py, make_lookups.py)."""
     global _TEMPLATES
     if _TEMPLATES is None:
-        tp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'fsm_templates.json')
+        from hkcommon import lookup_path
+        tp = lookup_path('fsm_templates.json')
         _TEMPLATES = json.load(open(tp)) if os.path.exists(tp) else {}
     path = _TEMPLATES.get(guid)
     if not path: return None, None
+    from hkcommon import EX
+    if not os.path.isabs(path): path = os.path.join(EX, path)                # paths are relative to the export's ex/
+    elif not os.path.exists(path) and '/ex/' in path: path = os.path.join(EX, path.split('/ex/', 1)[1])
+    if not os.path.exists(path): return None, None
     if path not in _TEMPLATE_FSM:
         objs = load_objs(path)
         _TEMPLATE_FSM[path] = next(((v['fsm'], Paths(objs)) for k, (t, v) in objs.items() if isinstance(v.get('fsm'), dict)), (None, None))

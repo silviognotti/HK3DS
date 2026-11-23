@@ -13,10 +13,11 @@ import bake_scene as B
 import build_room as BR
 from texpack import MORTON
 
-HAZE2 = 'b04b22f2cc0b98f4992e9b4a31714b97'
+HAZE2 = B.export_ids().get('herolight') or 'b04b22f2cc0b98f4992e9b4a31714b97'     # make_lookups.py: this export's guid
 SCALE = 3.0                  # the HeroLight transform's scale
 romfs = sys.argv[1]
 sp = B.sprite_asset(HAZE2)
+if sp is None: sys.exit('the HeroLight sprite (haze2): not in the export (run make_lookups.py: tools/build.sh --from lookups)')
 im, offx, offy, rw, rh, pivx, pivy, ppu = B.sprite_image(sp)
 al = np.asarray(im.convert('RGBA'))[..., 3]
 lum = np.asarray(im.convert('RGBA'))[..., :3].astype(np.float32).max(-1) / 255.0

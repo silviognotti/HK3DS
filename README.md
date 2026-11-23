@@ -98,6 +98,7 @@ What the steps do:
 | Step | What it makes |
 |---|---|
 | `index` | indexes of your export that the converters read (`tools/index_export.py`, `alpha_cache.py`, `match_textures.py`) |
+| `lookups` | the tables that go by asset IDs, found again in your export by name (`tools/make_lookups.py`, into `hkdata/lookups/`): music and ambience cues, state machine templates, lit and glow materials, a few sprites. AssetRipper gives assets new IDs on every export, so these can't come with the repository. Check the `WARNING` lines in `work/logs/lookups.log` |
 | `objects` | every room's live objects: enemies, NPCs, levers, their state machines and the prefabs they spawn (`build_objs.py`); the Knight's own (`build_knight.py`) |
 | `rooms` | every room's collision, exits and baked parallax art (`build_room.py`); the slowest step |
 | `install` | the rooms in `romfs/rooms/`: compressed, with camera locks, secret masks and linked exits |
@@ -109,7 +110,8 @@ What the steps do:
 
 The build makes plain stand-in icons and banners (`icon.png`, `cia/banner.png`...) if you don't have your own; put
 your own art there any time. `tools/data/` holds the port's own lookup tables (no game assets): which game script each
-component is, the music cues, the objects each room converts.
+component is, the objects each room converts. The tables keyed by asset IDs there fit only the export the repository
+was built from; the `lookups` step makes yours.
 
 ## Installing
 From v1.1 the game comes in two parts: a small program (the CIA, or the `.3dsx`) and one big game data file that goes

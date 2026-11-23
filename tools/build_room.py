@@ -55,7 +55,7 @@ MAPZONES = ['NONE', 'TEST_AREA', 'KINGS_PASS', 'CLIFFS', 'TOWN', 'CROSSROADS', '
             'TRAM_UPPER', 'TRAM_LOWER', 'FINAL_BOSS', 'SOUL_SOCIETY', 'ACID_LAKE', 'NOEYES_TEMPLE', 'MONOMON_ARCHIVE', 'MANTIS_VILLAGE',
             'RUINED_TRAMWAY', 'DISTANT_VILLAGE', 'ABYSS_DEEP', 'ISMAS_GROVE', 'WYRMSKIN', 'LURIENS_TOWER', 'LOVE_TOWER', 'GLADE',
             'BLUE_LAKE', 'PEAK', 'JONI_GRAVE', 'OVERGROWN_MOUND', 'CRYSTAL_MOUND', 'BEASTS_DEN', 'GODS_GLORY', 'GODSEEKER_WASTE']
-AUDIO_MAP = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'audio_map.json')))
+AUDIO_MAP = json.load(open(lookup_path('audio_map.json')))      # music / atmos cue guid -> ogg (make_lookups.py)
 
 def area_of(name):
     """(music cue, atmos loop, map zone) from the scene's SceneManager: '-' keeps what is playing, 'none' is silence."""

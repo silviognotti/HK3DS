@@ -7,7 +7,7 @@ import sys, os, re, json, math, glob, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fsm_extract as F
 import cs_sigs
-from hkcommon import metamap, EX, load_yaml_docs
+from hkcommon import metamap, EX, load_yaml_docs, export_ids
 import build_room as BR
 
 SIGS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'cs_sigs.json')))
@@ -96,6 +96,7 @@ def classify_mb(v):
 NATIVE_PREFABS = ('Arrow Prompt New', 'Arrow Prompt', 'Audio Player Actor', 'Audio Player Actor 2D')
 
 TRAJAN_FONTS = ('0075d91c', '58cae6a7')     # TMP font assets drawn with the Trajan bitmap font (else Perpetua)
+TRAJAN_GUIDS = set(export_ids().get('trajan_fonts') or ())     # this export's (make_lookups.py)
 
 class Exporter:
     def __init__(self):
@@ -266,7 +267,7 @@ class Exporter:
                         fg = (v.get('m_fontAsset') or {}).get('guid') or ''
                         c = {'k': 'tmp', 'text': str(v.get('m_text') or ''), 'size': float(v.get('m_fontSize') or 8),
                              'align': int(v.get('m_textAlignment', 0) or 0), 'col': [float(col.get(q, 1)) for q in 'rgba'],
-                             'font': 1 if fg[:8] in TRAJAN_FONTS else 0, 'en': en}
+                             'font': 1 if (fg in TRAJAN_GUIDS if TRAJAN_GUIDS else fg[:8] in TRAJAN_FONTS) else 0, 'en': en}
                         sd = tr.get('m_SizeDelta')
                         if isinstance(sd, dict) and isinstance(tr.get('m_AnchoredPosition'), dict):   # RectTransform: text box width + pivot
                             pv = tr.get('m_Pivot') or {}

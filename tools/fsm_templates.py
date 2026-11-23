@@ -2,11 +2,12 @@
 """PlayMaker FSM templates: PlayMakerFSM components with fsmTemplate run the template asset's states and actions with
 their own variable values. The template assets (MonoBehaviour/*.asset) have no .meta, so their guids are matched here
 from how the scenes use them: the component's variable names must equal the template's, then the name decides.
-   python fsm_templates.py   -> data/fsm_templates.json {guid: asset path}"""
+   python fsm_templates.py   -> $HKDATA/lookups/fsm_templates.json {guid: asset path in the export's ex/}
+(make_lookups.py runs it; the guids are this export's own, issue #6)"""
 import sys, os, re, json, glob, subprocess, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fsm_extract as F
-from hkcommon import EX
+from hkcommon import EX, LOOKUPS
 
 KINDS = ('floatVariables', 'intVariables', 'boolVariables', 'stringVariables', 'vector2Variables', 'vector3Variables',
          'colorVariables', 'rectVariables', 'quaternionVariables', 'gameObjectVariables', 'objectVariables', 'materialVariables',
@@ -47,10 +48,12 @@ def main():
             pool = cands or list(assets)
             for p in pool:
                 if assets[p][0] in names: pick = p; break
-        if pick: out[g] = pick
+        if pick: out[g] = os.path.relpath(pick, EX)
         else: print('unmatched', g, cnt.most_common(2), len(cands))
-    json.dump(out, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'fsm_templates.json'), 'w'), indent=1)
+    os.makedirs(LOOKUPS, exist_ok=True)
+    json.dump(out, open(os.path.join(LOOKUPS, 'fsm_templates.json'), 'w'), indent=1, sort_keys=True)
     print(len(out), 'of', len(uses), 'templates matched')
+    return len(out), len(uses)
 
 if __name__ == '__main__':
     main()

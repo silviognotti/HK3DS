@@ -7,7 +7,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bake_scene as B
 from texpack import MORTON
-sp = B.sprite_asset('f6afd349486b57545a4d6b7a09281673')
+sp = B.sprite_asset(B.export_ids().get('vignette') or 'f6afd349486b57545a4d6b7a09281673')   # make_lookups.py
+if sp is None: sys.exit('vignette_large_v01: no such sprite in the export (run make_lookups.py: tools/build.sh --from lookups)')
 im = B.sprite_image(sp)[0]                     # 256 x 170, RGB 0
 a = np.zeros((256, 256), np.uint8)
 al = np.asarray(im)[..., 3]

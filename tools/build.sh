@@ -22,7 +22,7 @@
 set -o pipefail
 TOP=$(cd "$(dirname "$0")/.." && pwd); T=$TOP/tools; W=$TOP/work
 HD=0; ONLY=""; FROM=""; COMPILE=1; CHECKONLY=0; ROOMS=$T/data/all_rooms.txt; JOBS=1
-STEPS="check index objects rooms install pack particles gamedata compile"
+STEPS="check index lookups objects rooms install pack particles gamedata compile"
 HDSTEPS="hd_copy hd_rooms hd_objects hd_gamedata hd_compile"
 
 while [ $# -gt 0 ]; do
@@ -58,6 +58,7 @@ say() { echo "$@" >&3; }
 fail() { echo >&3; echo "FAILED: $1" >&3; [ -n "$2" ] && { echo "  log: $2" >&3; echo "  its last lines:" >&3; tail -n 15 "$2" | sed 's/^/    /' >&3; }
          echo >&3; echo "Fix that and run the same command again: it carries on from there." >&3; exit 1; }
 done_mark() { touch "$W/done/$1"; }
+lookup() { if [ -f "$HKDATA/lookups/$1" ]; then echo "$HKDATA/lookups/$1"; else echo "$T/data/$1"; fi; }   # make_lookups.py's, else the repository's
 is_done() { [ -f "$W/done/$1" ]; }
 
 # run_rooms STEP CMD...: run CMD <room> for every room not done yet in STEP (one marker per room, so a long step
@@ -133,6 +134,21 @@ for f in ('AudioClip', 'GameObject', 'Material', 'MonoBehaviour', 'Sprite', 'Tex
 uanim.index()" ) || return 1
 }
 
+step_lookups() {
+  # the tables that go by asset guids, made from this export (AssetRipper gives assets new guids every export, issue
+  # #6): music and ambience cues, FSM templates, lit / additive materials, a few sprites -> $HKDATA/lookups/
+  local L=$HKDATA/lookups old=""
+  [ -d "$L" ] && old=$(cat "$L"/* 2>/dev/null | cksum)
+  ( cd "$T" && "$PY" make_lookups.py ) || return 1
+  if [ -n "$old" ] && [ "$old" != "$(cat "$L"/* 2>/dev/null | cksum)" ] && is_done objects; then
+    say "  the lookup tables changed: run tools/build.sh --from objects to convert the rooms with them"
+  elif [ -z "$old" ] && is_done objects; then
+    say "  rooms converted before this step existed: tools/build.sh --from objects converts them with this export's tables"
+  fi
+  grep -q '^WARNING' "$W/logs/lookups.log" 2>/dev/null && say "  some tables are incomplete: see the WARNING lines in work/logs/lookups.log"
+  return 0
+}
+
 step_objects() {
   # every room's live objects: enemies, NPCs, interactables, their state machines and the prefabs they spawn;
   # and the Knight's own (build_knight.py)
@@ -200,7 +216,7 @@ step_gamedata() {
   && "$PY" darkness.py "$R" "$ROOMS" && "$PY" nonslider.py "$R" "$ROOMS" \
   && "$PY" pantheons.py "$R" && "$PY" gg_doors.py "$R" \
   && "$PY" additive.py "$X/additive.txt" && "$PY" area_titles.py "$X/area_titles.txt" \
-  && cp data/gg_statues.txt data/music_cues.txt "$X/" \
+  && cp data/gg_statues.txt "$X/" && cp "$(lookup music_cues.txt)" "$X/music_cues.txt" \
   && "$PY" build_music.py "$R/music" \
   && "$PY" zwrap.py "$G"/knight.spr "$G"/enemies.spr "$G"/hud.spr "$G"/ui.spr "$G"/dialog.spr "$G"/font_text.spr \
                     "$G"/font_menu.spr "$G"/font_big.spr "$G"/stagmenu.spr \

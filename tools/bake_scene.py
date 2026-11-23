@@ -174,6 +174,9 @@ ADDITIVE_MATERIALS = {'3568007dc8719774da20a4b13d8cd951', '1a920692695ab0a45b364
                       'b22d93483c9302f4a9e2de49c757dbbf', '1092315befb296c4dbf62bcc08fa966d', '3aa61abb3b7f7aa43b5f556d35217e3f',
                       '7f89a24ce5bf04240bd1f8bb2192906b'}
 LIT_SHADERS = {'af03469dd3490ec49adbc7cb6fbb95c4', 'd66f83432c026994cba4390ea7538143', 'aa384301be115094b97aec44438c90c3'}
+# (the guids above are the repository's export's: make_lookups.py finds this export's own, issue #6)
+ADDITIVE_MATERIALS = set(export_ids().get('additive_materials') or ADDITIVE_MATERIALS)
+LIT_SHADERS = set(export_ids().get('lit_shaders') or LIT_SHADERS)
 @functools.lru_cache(None)
 def material_lit(guid):
     p = metamap('Material').get(guid)
