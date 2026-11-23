@@ -1015,6 +1015,19 @@ static void do_nail_hits(void) {
 }
 
 /* ---------------- InputHandler actions for FSMs / UI ---------------- */
+// The New 3DS family (New 2DS XL included) has ZL and ZR; the Old 3DS and 2DS don't. There, L is Super Dash (the bottom
+// screen shows the map all the time, so Quick Map can go) and Quick Cast is a tap of A, as Focus/Cast already is.
+static bool has_zl_zr(void) {
+    static int z = -1;
+    if (z < 0) {
+#ifdef __HOST__
+        z = getenv("HK_OLD3DS") ? 0 : 1;
+#else
+        bool n3 = false; APT_CheckNew3DS(&n3); z = n3;
+#endif
+    }
+    return z;
+}
 static void map_game_input(u32 down, u32 held, circlePosition cp) {
     GameInput p = gin, g; memset(&g, 0, sizeof g);
     g.upH = (held & KEY_DUP) || cp.dy > 70; g.downH = (held & KEY_DDOWN) || cp.dy < -70;
@@ -1027,7 +1040,10 @@ static void map_game_input(u32 down, u32 held, circlePosition cp) {
     g.quickCastP = down & KEY_ZR; g.quickCastH = held & KEY_ZR; g.quickCastR = !(held & KEY_ZR) && p.quickCastH;
     g.submitP = down & KEY_A; g.cancelP = down & KEY_B;
     g.dreamNailP = down & KEY_X; g.dreamNailH = held & KEY_X;
-    g.quickMapP = down & KEY_L; g.quickMapH = held & KEY_L; g.inventoryP = down & KEY_SELECT; g.superDashP = down & KEY_ZL; g.superDashH = held & KEY_ZL;
+    u32 sd = has_zl_zr() ? KEY_ZL : KEY_L;
+    bool qm = has_zl_zr() || inv_open();         // without ZL, L still turns the inventory's panes
+    g.quickMapP = qm && (down & KEY_L); g.quickMapH = qm && (held & KEY_L); g.inventoryP = down & KEY_SELECT;
+    g.superDashP = down & sd; g.superDashH = held & sd;
     gin = g;
 }
 
@@ -2145,7 +2161,9 @@ void game_draw_bottom(void) {
           font_draw_centered(&A.fontMenu, zb, BOT_W / 2, 10, 1, C2D_Color32(230, 230, 230, 255)); }
     }
     if (g_hints) {   // control hints, shrunk to fit the screen when the language's are longer (Options: Button Hints)
-        const char *h[2] = { TR("B Jump  Y Nail  A Focus/Cast  R Dash  X Dream Nail"), TR("ZR Quick Cast  ZL Super Dash  SELECT Charms  START Pause") };
+        const char *h[2] = { TR("B Jump  Y Nail  A Focus/Cast  R Dash  X Dream Nail"),
+                             has_zl_zr() ? TR("ZR Quick Cast  ZL Super Dash  SELECT Charms  START Pause")
+                                         : TR("L Super Dash  SELECT Charms  START Pause") };
         for (int i = 0; i < 2; i++) {
             float w = font_width(&A.fontText, h[i]), sc = w * 0.8f > BOT_W - 16 ? (BOT_W - 16) / w : 0.8f;
             font_draw(&A.fontText, h[i], 8, 206 + i * 16, sc, C2D_Color32(150, 150, 160, 255));

@@ -19,6 +19,7 @@ PORT = [
     ("Up: Enter", "Arriba: entrar"),
     ("B Jump  Y Nail  A Focus/Cast  R Dash  X Dream Nail", "B Saltar  Y Aguijón  A Concentrar/Hechizo  R Embestida  X Onírico"),
     ("ZR Quick Cast  ZL Super Dash  SELECT Charms  START Pause", "ZR Hechizo rápido  ZL Superembestida  SELECT Amuletos  START Pausa"),
+    ("L Super Dash  SELECT Charms  START Pause", "L Superembestida  SELECT Amuletos  START Pausa"),
     ("L / R: Charms", "L / R: Amuletos"),
     ("A: Unequip", "A: Quitar"),
     ("A: Equip", "A: Equipar"),
