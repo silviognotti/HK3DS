@@ -1640,7 +1640,11 @@ void act_enter(Fsm *f, FsmAct *a) {
     case A_StopParticleEmitter: o = GO("gameObject"); if (o) particles_obj_play(o, false); FIN(); break;
     case A_SetParticleEmission: o = GO("gameObject"); if (o) particles_obj_emission(o, PB("emission", true)); FIN(); break;
     case A_SetParticleEmissionRate: o = GO("gameObject"); if (o) particles_obj_rate(o, PF("emissionRate", 10)); FIN(); break;
-    case A_SetParticleEmissionSpeed: case A_TransitionToAudioSnapshot: case A_VibrationPlayerPlay: case A_PlayVibration:
+    case A_TransitionToAudioSnapshot: { JVal *s = praw(a, "snapshot");      // build_objs.py: {snapshot, mixer} names
+        if (s && s->t == J_OBJ && jget(s, "var")) { FVar *v = VAR("snapshot"); s = v ? v->obj : NULL; }
+        if (s && s->t == J_OBJ && jget(s, "snapshot")) game_audio_snapshot(jstr(jget(s, "mixer"), ""), jstr(jget(s, "snapshot"), ""), PF("transitionTime", 0));
+        FIN(); break; }
+    case A_SetParticleEmissionSpeed: case A_VibrationPlayerPlay: case A_PlayVibration:
     case A_PlayVibrationV2: case A_SetProperty: case A_DebugLog: case A_SetTrailRenderer:
     case A_GetPreInstantiatedGameObject: case A_FadeAudio: case A_SetAudioVolume: case A_GetVelocity: case A_SetVelocity:
         FIN(); break;

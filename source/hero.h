@@ -182,6 +182,7 @@ void game_camera_fade(bool out, bool instant);
 void game_begin_transition(const char *scene, const char *gate);   // GameManager.BeginSceneTransition
 void game_freeze(float t);
 void game_music_cue(const char *guid, float delay, float transition);
+void game_audio_snapshot(const char *mixer, const char *snapshot, float transition);
 const char *game_map_zone(void);
 void game_save_now(void);
 bool game_nonslider(float x0, float y0, float x1, float y1);

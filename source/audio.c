@@ -201,6 +201,10 @@ void audio_stop_stream(int slot, float fadeOut) {
 }
 
 void audio_set_stream_volume(int slot, float v) { streams[slot].target = v; if (!streams[slot].fadeRate) streams[slot].fadeRate = 2; }
+void audio_fade_stream(int slot, float v, float seconds) {
+    if (!ndspOk || slot < 0 || slot > 1 || streams[slot].stopping) return;
+    streams[slot].target = v; streams[slot].fadeRate = seconds > 0.01f ? 1.0f / seconds : 100.0f;
+}
 
 void audio_update(float dt) {
     if (!ndspOk) return;

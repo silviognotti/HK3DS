@@ -1,6 +1,8 @@
 // HK3DS gameplay: the Knight, enemies, room entities, HUD, camera, transitions.
 // Movement constants are the values serialized on the game's HeroController (Knight prefab).
 #include "game.h"
+#include <ctype.h>
+#include <strings.h>
 #include "audio.h"
 #include "hero.h"
 #include "world.h"
@@ -123,6 +125,24 @@ static int blueHealth; static float hiveT;
 GameInput gin;
 static SpriteSet icons;
 const SpriteSet *game_icons(void) { return icons.loaded ? &icons : NULL; }
+// AudioMixerSnapshot.TransitionTo (TransitionToAudioSnapshot). The game ends a boss's music by moving the Music mixer to
+// a silent snapshot when the boss dies: the cue plays on, unheard, until a scene or a cue moves the mixer back. Here the
+// music fades out the same way and keeps playing; another snapshot of the Music mixer, a music cue or the next room
+// (SceneManager's music snapshot) brings it back. The other mixers' snapshots (atmos, actors...) are only logged.
+static bool musicHushed;
+static bool word_in(const char *s, const char *w) {      // w in s, ignoring case
+    for (size_t n = strlen(w); *s; s++) { size_t i = 0; while (i < n && s[i] && tolower((unsigned char)s[i]) == w[i]) i++; if (i == n) return true; }
+    return false;
+}
+void game_audio_snapshot(const char *mixer, const char *name, float transition) {
+    hk_log("audio snapshot %s: %s (%.1f s)", mixer, name, transition);
+    if (!word_in(mixer, "music")) return;
+    bool silent = word_in(name, "silent") || word_in(name, "silence") || word_in(name, "mute") || !strcasecmp(name, "off") ||
+                  !strcasecmp(name, "none") || !strcasecmp(name, "music off");
+    if (silent == musicHushed) return;
+    musicHushed = silent;
+    audio_fade_stream(0, silent ? 0 : 1, transition > 0 ? transition : silent ? 1.0f : 0.5f);
+}
 // AudioManager.ApplyMusicCue with the cue's asset guid (romfs/text/music_cues.txt, tools/data/audio_map.json)
 void game_music_cue(const char *guid, float delay, float transition) {
     static char (*keys)[33], (*vals)[32]; static int n = -1;
@@ -133,6 +153,7 @@ void game_music_cue(const char *guid, float delay, float transition) {
         if (f) { while (n < 128 && fgets(ln, sizeof ln, f)) if (sscanf(ln, "%32s %31s", keys[n], vals[n]) == 2) n++; fclose(f); }
     }
     for (int i = 0; i < n; i++) if (!strcmp(keys[i], guid)) {
+        if (musicHushed) { musicHushed = false; audio_fade_stream(0, 1, 0.5f); }    // a cue brings its own snapshot
         if (!strcmp(vals[i], "none")) audio_stop_stream(0, transition > 0 ? transition : 1.0f);
         else audio_play_stream(0, vals[i], true, transition > 0 ? transition : 0.5f);
         return;
@@ -537,6 +558,8 @@ static void place_at_gate(const char *gate) {
 
 static void enter_room(const char *id, const char *gate) {
     hk_log("enter %s (gate %s)", id, gate ? gate : "");
+    // the new scene moves the Music mixer back to its own snapshot (once its objects are in: one of them may silence it)
+    bool wasHushed = musicHushed; musicHushed = false;
     lang_gc();          // text of a language switched away from in the pause menu: nothing shows it any more
 #ifdef __HOST__
     fprintf(stderr, "enter_room(%s, %s)\n", id, gate ? gate : "");
@@ -601,6 +624,7 @@ static void enter_room(const char *id, const char *gate) {
     cam_load(id, (float)R.w, (float)R.h);
     masks_load(id);
     snap_camera();
+    if (wasHushed && !musicHushed) audio_fade_stream(0, 1, 2.0f);
     // SceneManager music / atmos cues: "-" keeps what is playing, "none" fades to silence
     if (R.music[0] && strcmp(R.music, "-")) { if (!strcmp(R.music, "none")) audio_stop_stream(0, 1.5f); else audio_play_stream(0, R.music, true, 2.0f); }
     if (R.ambience[0] && strcmp(R.ambience, "-")) { if (!strcmp(R.ambience, "none")) audio_stop_stream(1, 1.0f); else audio_play_stream(1, R.ambience, true, 2.0f); }

@@ -7,7 +7,7 @@ import sys, os, re, json, math, glob, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fsm_extract as F
 import cs_sigs
-from hkcommon import metamap, EX
+from hkcommon import metamap, EX, load_yaml_docs
 import build_room as BR
 
 SIGS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'cs_sigs.json')))
@@ -107,6 +107,10 @@ class Exporter:
         self.spritemap = metamap('Sprite')
         self.gomap = metamap('GameObject')
         self.clipmap = metamap('AudioClip')
+        # audio mixers (AssetRipper's AudioMixerController folder): TransitionToAudioSnapshot names its snapshot by the
+        # mixer's guid and the snapshot's file id, which mean nothing outside this export, so the snapshot goes in by name
+        self.mixermap = {**metamap('AudioMixer'), **metamap('AudioMixerController')}
+        self.mixers = {}        # mixer guid -> (mixer name, {file id: snapshot name})
 
     def ref(self, v, ctx):
         """Convert a {fileID,guid} reference."""
@@ -118,10 +122,26 @@ class Exporter:
             if g in self.gomap: self.want_prefab(g); return {'prefab': g}
             if g in self.clipmap: self.audio.add(g); return {'audio': os.path.splitext(os.path.basename(self.clipmap[g]))[0]}
             if g in self.spritemap: self.sprites.add(g); return {'sprite': g}
+            if g in self.mixermap:
+                mixer, snaps = self.mixer(g)
+                if fid in snaps: return {'snapshot': snaps[fid], 'mixer': mixer}
             return {'asset': g}
         if fid in ctx['goidx']: return {'o': ctx['goidx'][fid]}
         if fid in ctx['compidx']: return {'o': ctx['compidx'][fid][0], 'c': ctx['compidx'][fid][1]}
         return {'ext': fid}
+
+    def mixer(self, g):
+        if g not in self.mixers:
+            name, snaps = os.path.splitext(os.path.basename(self.mixermap[g]))[0], {}
+            try:
+                for fid, (t, v) in load_yaml_docs(self.mixermap[g]).items():
+                    if not isinstance(v, dict): continue
+                    if t == 'AudioMixerController' and v.get('m_Name'): name = v['m_Name']
+                    if t == 'AudioMixerSnapshotController' and v.get('m_Name'): snaps[fid] = v['m_Name']
+            except (OSError, UnicodeDecodeError) as ex:
+                print(f'mixer {self.mixermap[g]}: {ex}', file=sys.stderr)
+            self.mixers[g] = (name, snaps)
+        return self.mixers[g]
 
     def want_prefab(self, g):
         if g not in self.prefabs:
