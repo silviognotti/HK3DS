@@ -93,6 +93,9 @@ int main(int argc, char **argv) {
       // from a launcher running in 80 or 96 MB, a memory-hungry plugin): 16-bit sprite pages and leaner caches. The
       // full-colour set needs the whole 124 MB; with less, sprites and backgrounds failed to load.
       g_lowmem = envGetLinearHeapSize() < (56u << 20);
+      extern bool g_lowEffects, g_lowParticles;
+      g_lowEffects = g_lowmem;
+      g_lowParticles = g_lowmem;
       hk_log("%s 3DS, %s memory", n3ds ? "New" : "Old", g_lowmem ? "low" : "full"); }
 #endif
     audio_init();

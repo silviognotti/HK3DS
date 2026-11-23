@@ -1,5 +1,0 @@
-Xun NPC
-Heart Piece Folder
-left1
-ruind_dressing_light_03
-_SceneManager

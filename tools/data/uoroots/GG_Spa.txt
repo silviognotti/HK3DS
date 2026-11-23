@@ -1,8 +1,0 @@
-blue stuff
-Boss Scene Controller
-right1
-Spa Region
-GG_Arena_Prefab/Darkness Region
-spa_pieces/atrium_NPC_trihead_sit
-spa_pieces/atrium_NPC_Hornhead_sit (1)
-Wall_L

@@ -156,7 +156,16 @@ def material(guid):
 
 # Particle materials' textures aren't in the asset export; data/particle_textures.json maps each material (by name) to
 # its texture's name, read from the game's .assets files (tools/unityfile.py), and the images are found by name
-MAT2TEX = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'particle_textures.json')))
+PARTICLE_TEXTURES = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'data',
+    'particle_textures.json',
+)
+MAT2TEX = (
+    json.load(open(PARTICLE_TEXTURES))
+    if os.path.isfile(PARTICLE_TEXTURES)
+    else {}
+)
 TEXDIRS = [os.environ.get('HKDATA', 'hkdata') + '/ex/Texture2D', os.environ.get('HKDATA', 'hkdata') + '/hs/Texture2D']
 
 @functools.lru_cache(None)

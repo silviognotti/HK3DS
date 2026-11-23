@@ -1619,10 +1619,12 @@ int game_update(float dt, u32 down, u32 held, u32 up, circlePosition cp) {
             }
             if (down & (KEY_START | KEY_B)) { paused = false; sfx_play("button", 0.6f); }
         } else {
-            if (down & (KEY_DUP | KEY_DDOWN)) { pauseSel = (pauseSel + ((down & KEY_DUP) ? 3 : 1)) % 4; pausePtrT = 0; sfx_play("button", 0.6f); }
+            if (down & (KEY_DUP | KEY_DDOWN)) { pauseSel = (pauseSel + ((down & KEY_DUP) ? 5 : 1)) % 6; pausePtrT = 0; sfx_play("button", 0.6f); }
             if (down & (KEY_DLEFT | KEY_DRIGHT | (pauseSel >= 2 ? KEY_A : 0))) {
                 if (pauseSel == 2) { lang_set((g_lang + 1) % LANG_COUNT); ach_reload(); }      // Language
                 else if (pauseSel == 3) g_hints = !g_hints;                                     // Button Hints
+                else if (pauseSel == 4) g_lowEffects = !g_lowEffects;
+                else if (pauseSel == 5) g_lowParticles = !g_lowParticles;
                 else {
                     float d = (down & KEY_DLEFT) ? -0.1f : 0.1f; float *v = pauseSel == 0 ? &g_musicVolume : &g_sfxVolume;
                     *v += d; if (*v < 0) *v = 0; if (*v > 1) *v = 1;
@@ -1903,6 +1905,8 @@ static void herolight_room(const char *room) {
     free(t);
 }
 static void herolight_draw(void) {
+    extern bool g_lowEffects;
+    if (g_lowEffects) return;
     if (!roomLoaded) return;
     if (hlState == 0) {
         hlState = -1;
@@ -2014,14 +2018,16 @@ void game_draw_top(void) {
     if (roomLoaded && !g_noFront) room_draw_layers(&R, camx, camy, true);   // the rest go in among the layers
     SECFILL(4);
     particles_draw_over(camx, camy, 1, 13);                                  // dust in the sorting layers above the scenery
-    if (roomLoaded && !g_noFront) room_draw_over(&R, camx, camy);            // glows and haze Unity draws over everything
+    extern bool g_lowEffects;
+    if (roomLoaded && !g_noFront && !g_lowEffects) room_draw_over(&R, camx, camy); // glows and haze Unity draws over everything
     particles_draw_over(camx, camy, 13, 1 << 30);
     uo_draw_last(camx, camy);
     SECFILL(5);
     {   // darkness (SceneManager.darknessLevel): the vignette around the Knight; the lantern widens it
         extern bool uo_has_vignette(void);
         int dl = roomLoaded && !uo_has_vignette() ? game_darkness_level() : 0;
-        if (dl > 0) {
+        extern bool g_lowEffects;
+        if (dl > 0 && !g_lowEffects) {
             float r0 = dl >= 2 && !pd_bool("hasLantern") ? 1.2f : 4.5f, r1 = dl >= 2 && !pd_bool("hasLantern") ? 3.2f : 9.0f;
             float cx = world_to_sx(KX), cy = world_to_sy(KY + COL_OFF_Y), a0 = r0 * PPU, a1 = r1 * PPU, far = 900;
             u32 clear = C2D_Color32(0, 0, 0, 0), dark = C2D_Color32(0, 0, 0, dl >= 2 ? 250 : 215);
@@ -2098,14 +2104,16 @@ void game_draw_top(void) {
                 if (i == pauseSel) menu_draw_pointers(TOP_W / 2, y + A.fontMenu.lineh / 2, font_width(&A.fontMenu, pi[i]) / 2, pausePtrT);
             }
         } else {
-            char a[64], b[64], c[64], d[64];
+            char a[64], b[64], c[64], d[64], e[64], f[64];
             snprintf(a, sizeof a, "%s  %d", lang_get_or_key("AUDIO_MUSIC_VOL", "MainMenu"), (int)roundf(g_musicVolume * 10));
             snprintf(b, sizeof b, "%s  %d", lang_get_or_key("AUDIO_SOUND_VOL", "MainMenu"), (int)roundf(g_sfxVolume * 10));
             snprintf(c, sizeof c, "%s  %s", lang_get_or_key("GAME_LANGUAGE", "MainMenu"), lang_name(g_lang));
             snprintf(d, sizeof d, "%s  %s", TR("Button Hints"), lang_get_or_key(g_hints ? "MOH_ON" : "MOH_OFF", "MainMenu"));
-            const char *oi[4] = { a, b, c, d };
+            snprintf(e, sizeof e, "%s  %s", "Effects", g_lowEffects ? "Low" : "Normal");
+            snprintf(f, sizeof f, "%s  %s", "Particles", g_lowParticles ? "Low" : "Normal");
+            const char *oi[6] = { a, b, c, d, e, f };
             font_draw_centered(&A.fontMenu, lang_get_or_key("PAUSE_OPTIONS", "MainMenu"), TOP_W / 2, 52, 1, wc);
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 6; i++) {
                 float y = 92 + i * 26;
                 font_draw_centered(&A.fontMenu, oi[i], TOP_W / 2, y, 1, wc);
                 if (i == pauseSel) menu_draw_pointers(TOP_W / 2, y + A.fontMenu.lineh / 2, font_width(&A.fontMenu, oi[i]) / 2, pausePtrT);

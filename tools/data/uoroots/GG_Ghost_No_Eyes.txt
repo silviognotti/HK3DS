@@ -1,6 +1,0 @@
-Warrior
-GG_Arena_Prefab
-No Eyes Head
-Boss Scene Controller
-_SceneManager
-GG Ghost Boss Title

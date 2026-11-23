@@ -1,8 +1,0 @@
-Colosseum Manager
-left1
-colosseum gold trophy
-Colosseum Gate
-left1 (1)
-Darkness Region
-Exit Blocker
-_SceneManager

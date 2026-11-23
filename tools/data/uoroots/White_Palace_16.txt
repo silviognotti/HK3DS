@@ -1,7 +1,0 @@
-white_butterflies_left (1)
-white_butterflies_right
-Darkness Region (1)
-left1
-left2
-World Edge v2
-_SceneManager

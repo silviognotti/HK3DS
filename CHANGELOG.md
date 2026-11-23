@@ -46,7 +46,7 @@ Everything in those rooms runs the game's own scripts (PlayMaker state machines 
   `SD:/3ds/hk3ds/patch/<std|hd>/` (`tools/make_patch.py`: `hk3ds_update_v<ver>_<ed>.zip`; `--record-base` writes the
   release's file lists, `patches/base_v1.1.0/`). Luma game patching is no longer used; an update checks the CIA's code
   against the ELF. The title-screen warnings now speak of the data file (`patch.c`).
-- `tools/build.sh` makes the data files too and says where each file goes on the SD card.
+- `scripts/00_build.sh` makes the data files too and says where each file goes on the SD card.
 
 ## Fixes in v1.0.25 (patch)
 - **False Knight's arena on the Old 3DS: no floor, no boss.** The standard build ran out of memory in Crossroads_10, the
@@ -59,9 +59,9 @@ Everything in those rooms runs the game's own scripts (PlayMaker state machines 
 - **Per-frame hitboxes lost in 25 rooms.** `tools/tk_colliders.py` writes each animated object's per-frame collider
   boxes (`tkbox`) into its room's `.obj`, but nothing ran it after `pack_objs.py`, which writes a fresh `.obj`: the 24
   re-packed rooms of v1.0.24's particle fix (and Crossroads_01) had lost them, so the Mantis Warriors', husks' and the
-  Collector's attack boxes stayed as saved in the scene. Restored; `tools/build.sh` runs it after every pack, and
+  Collector's attack boxes stayed as saved in the scene. Restored; `scripts/00_build.sh` runs it after every pack, and
   `tools/regress.sh` checks that running it again over the rooms changes nothing.
-- **Build tools.** `tools/build.sh` builds everything from the export in one command (see the public README);
+- **Build tools.** `scripts/00_build.sh` builds everything from the export in one command (see the public README);
   `pack_objs.py` creates `romfs/sfx/` itself (a fresh build converted no sounds at all, silently), the Knight's atlas
   comes from the texture dump (`hkcommon.KNIGHT_ATLAS`), `tools/data/` gains `gg_statues.txt` and `music_cues.txt`
   (no tool made them), and `tools/make_icons.py` makes stand-in icons and banners when there are none.
@@ -76,7 +76,7 @@ Everything in those rooms runs the game's own scripts (PlayMaker state machines 
   and Godhome), was missing: those rooms' objects were packed again on Nov 17, and `pack_objs.py` writes a fresh
   `<Room>.obj` without the particle systems and sprite materials `tools/obj_particles.py` adds. The shots still hit;
   they just couldn't be seen. `obj_particles.py` has run on them again (145 particle systems in Fungus2_03 alone,
-  plus the lit and additive sprite materials), and `full_rebuild.sh` and `export_all.sh` now run it after every
+  plus the lit and additive sprite materials), and `scripts/03_full_rebuild.sh` and `scripts/02_export_all.sh` now run it after every
   `pack_objs.py`. The patch carries the 42 rooms' `.obj` files (and their `_pto.spr` where they changed).
 
 ## Fixes in v1.0.23 (patch)
@@ -397,7 +397,7 @@ Everything in those rooms runs the game's own scripts (PlayMaker state machines 
 - Tested this time: the test bot played every room using every power at random, with enemies hitting the Knight (half
   the rooms also with uneven frame times), checking that the Knight never floats, no cast gets stuck and pausing never
   stays blocked by accident; the
-  full regression suite (`tools/regress.sh`), with new checks for everything above plus the earlier fixes (every shiny
+  full regression suite (`scripts/05_regress.sh`), with new checks for everything above plus the earlier fixes (every shiny
   item pickup, every Godhome boss arena, the dream bosses, Mantis Lords, Watcher Knights, Traitor Lord, Hornet 2, the
   Hollow Knight with the first ending and the Radiance with Dream No More). In the 3DS emulator: the heaviest rooms on
   a build limited to 80 MB, with the old and the new memory rules, plus 249 of the 480 rooms on the CIA's 124 MB in
@@ -419,7 +419,7 @@ Everything in those rooms runs the game's own scripts (PlayMaker state machines 
   it keeps 150 rubble pieces under the floor, each listening for the Knight, and the trigger check tested every
   pair of objects. Objects now only test those on layers they can collide with: about three times faster there and
   twice as fast in ordinary rooms.
-- New checks in `tools/regress.sh`: the Crossroads wall breaks and uncovers its area, a Husk Guard's corpse comes
+- New checks in `scripts/05_regress.sh`: the Crossroads wall breaks and uncovers its area, a Husk Guard's corpse comes
   to rest, and a full False Knight fight ends with his armour still on the floor.
 
 ## Fixes in v1.0.10
@@ -456,7 +456,7 @@ Found by sweeping every room, arena and boss with the test bot instead of waitin
   die and record their defeat: Hornet, False Knight, Gruz Mother, Brooding Mawlek, Soul Master, Dung Defender,
   Crystal Guardian, Nosk, Uumuu, Flukemarm, Hive Knight, Broken Vessel and the Collector. Not checked this way: the
   Mantis Lords, Watcher Knights, Traitor Lord, Hornet at Kingdom's Edge, the dream bosses, Grimm and the endings.
-- `tools/regress.sh` gained checks for freed grubs staying freed, the Grubfather's rewards, the door, the lift, the
+- `scripts/05_regress.sh` gained checks for freed grubs staying freed, the Grubfather's rewards, the door, the lift, the
   Mawlek waking, the Collector's jars and the Soul Twister.
 
 ## Fixes in v1.0.8 (fifth playtest)
@@ -476,7 +476,7 @@ Found by sweeping every room, arena and boss with the test bot instead of waitin
   so it grows as they burst out instead of staying a thin strip at the base.
 - **Grubfather's room**: the saved grubs sit in their holes (objects now use their world depth, not the depth inside
   their folder), and the Grubfather is drawn in front of the wall behind him.
-- `tools/regress.sh` gained checks for all of these, including a full Gruz Mother fight.
+- `scripts/05_regress.sh` gained checks for all of these, including a full Gruz Mother fight.
 
 ## Fixes in v1.0.7 (fourth playtest)
 - **Menus that were dark boxes on a real 3DS**: the shop list, the pause menu, the inventory and charm screens, item
@@ -495,7 +495,7 @@ Found by sweeping every room, arena and boss with the test bot instead of waitin
 - **Gruzzers flying out of rooms**: the room's collision ends at its edge, and past a doorway the floor and ceiling ran
   on forever, so a Gruzzer that flew into a doorway zig-zagged off into nowhere (sooner at the 3DS's lower frame
   rates). Enemies and other objects now meet a wall just outside the room's sides; the Knight's doorways stay open.
-- `tools/regress.sh` gained checks for the Elder Baldur's goop, Gruzzers staying in their room at 20 fps and Sly's shop.
+- `scripts/05_regress.sh` gained checks for the Elder Baldur's goop, Gruzzers staying in their room at 20 fps and Sly's shop.
 
 ## Fixes in v1.0.6
 - **The light around the Knight** was drawn as a stepped grey halo with hard rings (most visible in dark rooms such as
@@ -548,7 +548,7 @@ Found by sweeping every room, arena and boss with the test bot instead of waitin
   you leave. Both were drawn as permanent black covers; they now fade in and out with the Knight, as in the game.
 - **Old 3DS**: the game now adapts to an Old 3DS's 64 MB (leaner caches, 16-bit full-colour textures, more memory
   for graphics). It runs, but expect a much lower frame rate than on a New 3DS in busy rooms.
-- `tools/regress.sh` gained checks for the Crossroads camera, Divine's tent, the Baldur's damage and knockback, the
+- `scripts/05_regress.sh` gained checks for the Crossroads camera, Divine's tent, the Baldur's damage and knockback, the
   Snail Shaman, the hot spring, Vengeful Spirit, benches and the False Knight's gates.
 
 ## Fixes in v1.0.4 (second playtest)
@@ -562,7 +562,7 @@ Found by sweeping every room, arena and boss with the test bot instead of waitin
 - **New Game played the landing animation and sound mid-air**: the opening script checked the Knight's height before he
   was placed in the room. It now waits for him, so he lands when he reaches the floor.
 - Reading a lore tablet now fully finishes its script, so it can be read again.
-- `tools/regress.sh`: must-pass tests on the PC build (exits, the well, the King's Pass door, the chest and charm, the
+- `scripts/05_regress.sh`: must-pass tests on the PC build (exits, the well, the King's Pass door, the chest and charm, the
   focus tablet, the camera, the opening fall, enemy blood clean-up, geo).
 
 ## Fixes in v1.0.1 and v1.0.2 (from playtesting on a real New 2DS XL)

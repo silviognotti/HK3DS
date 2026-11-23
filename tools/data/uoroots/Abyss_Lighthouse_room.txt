@@ -1,8 +1,0 @@
-Ruins Lever
-Ruins Soul Vial
-Steep Slope
-Dream Dialogue
-Ruins Vial Empty
-Window Collider
-Light Control
-_SceneManager

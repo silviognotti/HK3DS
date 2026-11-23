@@ -1,7 +1,0 @@
-Toll Machine Lift
-elev_main
-Ruins_front_gate/Ruins_gate_main
-left1
-right1
-Stag Blanker
-_SceneManager

@@ -1,5 +1,0 @@
-_Enemies/Giant Fly
-GG_Arena_Prefab
-Boss Scene Controller
-_SceneManager
-Battle Scene

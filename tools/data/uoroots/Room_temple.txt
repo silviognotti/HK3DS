@@ -1,7 +1,0 @@
-Hornet Black Egg NPC
-Quirrel
-Final Boss Door
-Infected_Parent
-SetTempleVisited
-UnInfected Parent
-_SceneManager

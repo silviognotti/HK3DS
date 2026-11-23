@@ -1,7 +1,0 @@
-left1
-Darkness Region
-Inspect Region
-Dream Dialogue
-right1
-_SceneManager
-GameObject

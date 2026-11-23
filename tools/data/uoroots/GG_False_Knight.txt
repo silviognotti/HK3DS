@@ -1,8 +1,0 @@
-Key Giver
-Battle Gate 2
-Battle Gate 3
-GG_Arena_Prefab
-Boss Scene Controller
-Battle Scene
-FK Saver
-_SceneManager

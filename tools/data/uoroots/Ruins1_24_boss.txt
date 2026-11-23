@@ -1,6 +1,0 @@
-Quake Fake Parent
-mage_window
-Mage Lord
-Mage Lord Phase2
-mage_particles
-mage_window break

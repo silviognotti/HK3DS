@@ -1,6 +1,0 @@
-Godseeker Young NPC
-Boss Scene Controller
-right1
-GG_Arena_Prefab/Darkness Region
-World Edge v2
-Binding Shield Control

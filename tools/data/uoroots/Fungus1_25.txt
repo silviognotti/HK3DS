@@ -1,7 +1,0 @@
-Fungus_Fat_pole (3)
-Fungus_Fat_pole (1)
-right1
-left1
-Fungus_Fat_pole
-Fungus_Fat_pole (2)
-_SceneManager

@@ -1,6 +1,0 @@
-Godseeker Young NPC
-Boss Scene Controller
-Acid Control v2
-right1
-GG_Arena_Prefab/Darkness Region
-World Edge v2

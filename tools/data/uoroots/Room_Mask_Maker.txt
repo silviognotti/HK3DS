@@ -1,5 +1,0 @@
-Maskmaker NPC
-right1
-Dream Dialogue
-Darkness Region
-_SceneManager

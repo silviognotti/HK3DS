@@ -1,7 +1,0 @@
-Warrior
-GG_Arena_Prefab
-Boss Scene Controller
-World Edge v2
-World Edge v2 (1)
-_SceneManager
-GG Ghost Boss Title

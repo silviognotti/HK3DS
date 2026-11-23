@@ -1,4 +1,0 @@
-left1
-Music Region
-Enviro Region
-_SceneManager

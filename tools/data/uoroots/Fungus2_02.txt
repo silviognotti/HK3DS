@@ -1,8 +1,0 @@
-Stag_tunnel_Grate
-Stag
-Station Bell
-door_stagExit
-right1
-station_pole/Stag_Pole_Tall_Break (2)
-Stag Blanker
-_SceneManager

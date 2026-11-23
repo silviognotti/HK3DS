@@ -1,9 +1,0 @@
-Tram Call Box
-Enviro Region
-Tram Main
-Direction Pole Spa
-door_tram_arrive
-Darkness Region
-left1
-_SceneManager
-Tram Station Check

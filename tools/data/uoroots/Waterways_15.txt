@@ -1,8 +1,0 @@
-Dung Defender_Awake
-Shiny Item Stand
-Dung Defender_Sleep
-Steep Slope
-Darkness Region
-door_dreamReturn
-Dung_Knight_Statue
-_SceneManager

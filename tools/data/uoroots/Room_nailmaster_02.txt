@@ -1,5 +1,0 @@
-NM Parent
-left1
-Scene Blanker
-Painting Parent
-_SceneManager

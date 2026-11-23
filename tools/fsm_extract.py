@@ -1,249 +1,805 @@
-# Decode PlayMaker FSMs (PlayMakerFSM components) from an AssetRipper scene/prefab into plain JSON.
-#   python fsm_extract.py <scene.unity|prefab> [object-name-substring] > out.json
-# Each FSM: name, owner path, start state, events, global transitions, variables, states with transitions and
-# actions (type, enabled, params by field name). Param values: numbers, strings, {"var": name} for variable refs,
-# {"go": path} / {"owner": true} for GameObjects, {"event": name}, lists for arrays.
-import sys, re, yaml, struct, json, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+#!/usr/bin/env python3
+"""Decode PlayMaker FSM components from AssetRipper YAML files.
 
-class _L(getattr(yaml, "CSafeLoader", yaml.SafeLoader)): pass
-# AssetRipper writes byte arrays as hex strings; YAML would turn "0101..." into (octal) ints. Keep ints as strings.
-_L.yaml_implicit_resolvers = {k: [(t, r) for t, r in v if t not in ('tag:yaml.org,2002:int', 'tag:yaml.org,2002:bool')] for k, v in yaml.SafeLoader.yaml_implicit_resolvers.items()}
+Usage:
+  python fsm_extract.py <scene.unity|prefab|asset> [object-name-substring]
+"""
 
-PT = ['Integer', 'Boolean', 'Float', 'String', 'Color', 'ObjectReference', 'LayerMask', 'Enum', 'Vector2', 'Vector3', 'Vector4',
-      'Rect', 'Array', 'Character', 'AnimationCurve', 'FsmFloat', 'FsmInt', 'FsmBool', 'FsmString', 'FsmGameObject',
-      'FsmOwnerDefault', 'FunctionCall', 'FsmAnimationCurve', 'FsmEvent', 'FsmObject', 'FsmColor', 'Unsupported', 'GameObject',
-      'FsmVector3', 'LayoutOption', 'FsmRect', 'FsmEventTarget', 'FsmMaterial', 'FsmTexture', 'Quaternion', 'FsmQuaternion',
-      'FsmProperty', 'FsmVector2', 'FsmTemplateControl', 'FsmVar', 'CustomClass', 'FsmArray', 'FsmEnum']
+from __future__ import annotations
 
-def H(s): return bytes.fromhex(s) if isinstance(s, str) and s else b''
-def ints(s): b = H(s); return list(struct.unpack('<%di' % (len(b) // 4), b))
-def num(x):
-    try: return float(x) if ('.' in str(x) or 'e' in str(x).lower()) else int(x)
-    except Exception: return x
+import argparse
+import functools
+import json
+import os
+import re
+import struct
+import sys
+from pathlib import Path
+from typing import Any, Iterable
 
-def load_objs(path):
-    src = open(path, encoding='utf-8').read()
-    parts = re.split(r"^--- !u!(\d+) &(-?\d+).*$", src, flags=re.M)
-    objs = {}
-    for i in range(1, len(parts), 3):
-        body = parts[i + 2]
-        need = 'fsm:' in body or 'm_Name' in body or 'm_Father' in body or 'm_GameObject' in body
-        if not need: continue
-        try: d = yaml.load(body, Loader=_L)
-        except Exception: continue
-        if d:
-            (t, v), = d.items(); objs[int(parts[i + 1])] = (t, v)
+import yaml
+
+from hkcommon import ROOT
+
+
+class _Loader(getattr(yaml, "CSafeLoader", yaml.SafeLoader)):
+    pass
+
+
+# Hex byte arrays must remain strings. Otherwise AssetRipper's "0101..." values
+# can be coerced to YAML integers or booleans.
+_Loader.yaml_implicit_resolvers = {
+    key: [
+        (tag, resolver)
+        for tag, resolver in resolvers
+        if tag not in ("tag:yaml.org,2002:int", "tag:yaml.org,2002:bool")
+    ]
+    for key, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+
+PARAM_TYPES = (
+    "Integer",
+    "Boolean",
+    "Float",
+    "String",
+    "Color",
+    "ObjectReference",
+    "LayerMask",
+    "Enum",
+    "Vector2",
+    "Vector3",
+    "Vector4",
+    "Rect",
+    "Array",
+    "Character",
+    "AnimationCurve",
+    "FsmFloat",
+    "FsmInt",
+    "FsmBool",
+    "FsmString",
+    "FsmGameObject",
+    "FsmOwnerDefault",
+    "FunctionCall",
+    "FsmAnimationCurve",
+    "FsmEvent",
+    "FsmObject",
+    "FsmColor",
+    "Unsupported",
+    "GameObject",
+    "FsmVector3",
+    "LayoutOption",
+    "FsmRect",
+    "FsmEventTarget",
+    "FsmMaterial",
+    "FsmTexture",
+    "Quaternion",
+    "FsmQuaternion",
+    "FsmProperty",
+    "FsmVector2",
+    "FsmTemplateControl",
+    "FsmVar",
+    "CustomClass",
+    "FsmArray",
+    "FsmEnum",
+)
+
+DOC_HEADER = re.compile(r"(?m)^--- !u!(\d+) &(-?\d+)[^\n]*\n")
+TEMPLATE_MARKER = re.compile(
+    r"fsmTemplate:\s*\{[^}\n]*fileID:\s*11400000\b", re.IGNORECASE
+)
+
+
+def hex_bytes(value: Any) -> bytes:
+    if not isinstance(value, str) or not value:
+        return b""
+    try:
+        return bytes.fromhex(value)
+    except ValueError:
+        return b""
+
+
+def int_list(value: Any) -> list[int]:
+    data = hex_bytes(value)
+    if not data:
+        if isinstance(value, list):
+            try:
+                return [int(item) for item in value]
+            except (TypeError, ValueError):
+                return []
+        return []
+    if len(data) % 4:
+        data = data[: len(data) - (len(data) % 4)]
+    return list(struct.unpack(f"<{len(data) // 4}i", data))
+
+
+def num(value: Any) -> Any:
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        text = str(value)
+        return float(text) if "." in text or "e" in text.lower() else int(text)
+    except (TypeError, ValueError):
+        return value
+
+
+def load_objs_text(src: str) -> dict[int, tuple[str, dict[str, Any]]]:
+    """Parse only YAML object documents that are relevant to FSM extraction."""
+    objs: dict[int, tuple[str, dict[str, Any]]] = {}
+    matches = list(DOC_HEADER.finditer(src))
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(src)
+        body = src[match.end() : end]
+        if (
+            "fsm:" not in body
+            and "m_Name" not in body
+            and "m_Father" not in body
+            and "m_GameObject:" not in body
+            and "m_Component:" not in body
+            and "m_Sprite:" not in body
+        ):
+            continue
+        try:
+            document = yaml.load(body, Loader=_Loader)
+        except yaml.YAMLError:
+            continue
+        if not isinstance(document, dict) or len(document) != 1:
+            continue
+        ((type_name, value),) = document.items()
+        if isinstance(value, dict):
+            objs[int(match.group(2))] = (str(type_name), value)
     return objs
 
+
+@functools.lru_cache(maxsize=128)
+def _load_objs_cached(
+    path: str, size: int, mtime_ns: int
+) -> dict[int, tuple[str, dict[str, Any]]]:
+    del size, mtime_ns
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        return load_objs_text(handle.read())
+
+
+def load_objs(path: str) -> dict[int, tuple[str, dict[str, Any]]]:
+    absolute = os.path.abspath(os.fspath(path))
+    try:
+        stat = os.stat(absolute)
+    except OSError:
+        return {}
+    return _load_objs_cached(absolute, stat.st_size, stat.st_mtime_ns)
+
+
 class Paths:
-    def __init__(self, objs):
-        self.go = {k: v for k, (t, v) in objs.items() if t == 'GameObject'}
-        self.tr = {k: v for k, (t, v) in objs.items() if t in ('Transform', 'RectTransform')}
-        self.go2tr = {int(v['m_GameObject']['fileID']): k for k, v in self.tr.items()}
-    def path(self, gid):
-        n, t = [], self.go2tr.get(gid)
-        while t is not None and t in self.tr:
-            g = int(self.tr[t]['m_GameObject']['fileID']); n.append(str(self.go.get(g, {}).get('m_Name')))
-            p = int(self.tr[t]['m_Father']['fileID']); t = p if p in self.tr else None
-        return '/'.join(reversed(n))
+    def __init__(self, objs: dict[int, tuple[str, dict[str, Any]]]):
+        self.go = {
+            fid: value
+            for fid, (type_name, value) in objs.items()
+            if type_name == "GameObject"
+        }
+        self.tr = {
+            fid: value
+            for fid, (type_name, value) in objs.items()
+            if type_name in ("Transform", "RectTransform")
+        }
+        self.go2tr = {}
+        for fid, value in self.tr.items():
+            game_object = value.get("m_GameObject") or {}
+            try:
+                self.go2tr[int(game_object.get("fileID", 0) or 0)] = fid
+            except (TypeError, ValueError):
+                pass
+        self._path_cache: dict[int, str] = {}
 
-def objref(v):
-    if not isinstance(v, dict) or not int(v.get('fileID', 0) or 0): return None
-    r = {'go': int(v['fileID'])}
-    if v.get('guid'): r['guid'] = v['guid']
-    return r
+    def path(self, gid: int) -> str:
+        if gid in self._path_cache:
+            return self._path_cache[gid]
+        names: list[str] = []
+        transform = self.go2tr.get(gid)
+        visited: set[int] = set()
+        while (
+            transform is not None and transform in self.tr and transform not in visited
+        ):
+            visited.add(transform)
+            transform_value = self.tr[transform]
+            game_object = transform_value.get("m_GameObject") or {}
+            try:
+                game_object_id = int(game_object.get("fileID", 0) or 0)
+            except (TypeError, ValueError):
+                break
+            name = self.go.get(game_object_id, {}).get("m_Name")
+            if name:
+                names.append(str(name))
+            father = transform_value.get("m_Father") or {}
+            try:
+                transform = int(father.get("fileID", 0) or 0)
+            except (TypeError, ValueError):
+                break
+            if transform not in self.tr:
+                transform = None
+        result = "/".join(reversed(names))
+        self._path_cache[gid] = result
+        return result
 
-def fsmvar(d, kind):
-    """FsmFloat-like dict from a typed param list."""
-    if d is None: return None
-    if int(d.get('useVariable', 0) or 0): return {'var': d['name']} if d.get('name') else {'none': True}
-    v = d.get('value')
-    if kind in ('FsmGameObject', 'FsmObject', 'FsmMaterial', 'FsmTexture'):
-        return objref(v)
-    if isinstance(v, dict) and set(v) <= {'x', 'y', 'z', 'w', 'r', 'g', 'b', 'a'}: return {k: num(x) for k, x in v.items()}
-    return num(v) if kind != 'FsmString' else v
 
-def decode_actions(ad, P):
-    names = ad.get('actionNames') or []
-    if not names: return []
-    starts = ints(ad['actionStartIndex'])
-    types = ints(ad['paramDataType']); pos = ints(ad['paramDataPos']); size = ints(ad['paramByteDataSize'])
-    pnames = ad.get('paramName') or []
-    bd = H(ad.get('byteData'))
-    en = H(ad.get('actionEnabled')) if isinstance(ad.get('actionEnabled'), str) else b'\x01' * len(names)
-    arr_sizes = ints(ad.get('arrayParamSizes')); arr_types = ad.get('arrayParamTypes') or []
-    L = lambda key: ad.get(key) or []
-    def byte_str(p, n): return bd[p:p + n].decode('utf-8', 'replace')
-    def one(k):
-        t = PT[types[k]] if 0 <= types[k] < len(PT) else str(types[k])
-        p, n = pos[k], size[k]
-        if t == 'Integer' or t == 'LayerMask' or t == 'Enum': return struct.unpack_from('<i', bd, p)[0] if n >= 4 else 0
-        if t == 'Boolean': return bool(bd[p]) if n else False
-        if t == 'Float': return struct.unpack_from('<f', bd, p)[0]
-        if t == 'String':
-            if n: return byte_str(p, n)
-            sp = L('stringParams')
-            return sp[p] if 0 <= p < len(sp) and sp[p] is not None else ''
-        if t in ('Vector2', 'Vector3', 'Vector4', 'Color', 'Rect', 'Quaternion'):
-            return list(struct.unpack_from('<%df' % (n // 4), bd, p))
-        if t == 'FsmFloat':
-            if n:
-                v = struct.unpack_from('<f', bd, p)[0]; use = bd[p + 4] if n > 4 else 0; nm = byte_str(p + 5, n - 5)
-                return ({'var': nm} if nm else {'none': True}) if use else v
-            return fsmvar(L('fsmFloatParams')[p], t)
-        if t == 'FsmInt':
-            if n:
-                v = struct.unpack_from('<i', bd, p)[0]; use = bd[p + 4] if n > 4 else 0; nm = byte_str(p + 5, n - 5)
-                return ({'var': nm} if nm else {'none': True}) if use else v
-            return fsmvar(L('fsmIntParams')[p], t)
-        if t == 'FsmBool':
-            if n:
-                v = bool(bd[p]); use = bd[p + 1] if n > 1 else 0; nm = byte_str(p + 2, n - 2)
-                return ({'var': nm} if nm else {'none': True}) if use else v
-            return fsmvar(L('fsmBoolParams')[p], t)
-        if t == 'FsmEvent':
-            if n: return {'event': byte_str(p, n)}
-            sp = L('stringParams')      # newer PlayMaker serialization: the event name sits in stringParams[pos]
-            return {'event': sp[p]} if 0 <= p < len(sp) and sp[p] else None
-        if t == 'FsmVector2':
-            if n:
-                v = list(struct.unpack_from('<2f', bd, p)); use = bd[p + 8] if n > 8 else 0; nm = byte_str(p + 9, n - 9)
-                return ({'var': nm} if nm else {'none': True}) if use else v
-            return fsmvar(L('fsmVector2Params')[p], t)
-        if t in ('FsmVector3', 'FsmColor', 'FsmQuaternion', 'FsmRect') and n:
-            k_ = 3 if t == 'FsmVector3' else 4
-            v = list(struct.unpack_from('<%df' % k_, bd, p)); use = bd[p + 4 * k_] if n > 4 * k_ else 0; nm = byte_str(p + 4 * k_ + 1, n - 4 * k_ - 1)
-            return ({'var': nm} if nm else {'none': True}) if use else v
-        lists = {'FsmString': 'fsmStringParams', 'FsmGameObject': 'fsmGameObjectParams', 'FsmVector3': 'fsmVector3Params',
-                 'FsmColor': 'fsmColorParams', 'FsmRect': 'fsmRectParams', 'FsmQuaternion': 'fsmQuaternionParams',
-                 'FsmObject': 'fsmObjectParams', 'FsmMaterial': 'fsmObjectParams', 'FsmTexture': 'fsmObjectParams',
-                 'FsmEnum': 'fsmEnumParams', 'FsmArray': 'fsmArrayParams', 'FsmVar': 'fsmVarParams'}
-        if t in lists:
-            lst = L(lists[t]); d = lst[p] if p < len(lst) else None
-            if t == 'FsmVar' and d:
-                vn = d.get('variableName'); tn = d.get('type')
-                return {'var': vn} if vn else {'type': tn, 'f': num(d.get('floatValue')), 'i': num(d.get('intValue')), 'b': num(d.get('boolValue')), 's': d.get('stringValue')}
-            if t == 'FsmEnum' and d:
-                return {'var': d['name']} if int(d.get('useVariable', 0) or 0) and d.get('name') else num(d.get('intValue'))
-            if t == 'FsmArray' and d:
-                return {'var': d['name']} if int(d.get('useVariable', 0) or 0) and d.get('name') else {'array': d.get('type'), 'floats': d.get('floatValues'), 'ints': d.get('intValues'), 'strings': d.get('stringValues'), 'bools': d.get('boolValues')}
-            return fsmvar(d, t)
-        if t == 'FsmOwnerDefault':
-            d = L('fsmOwnerDefaultParams')[p]
-            if int(d.get('ownerOption', 0) or 0) == 0: return {'owner': True}
-            g = d.get('gameObject') or {}
-            if int(g.get('useVariable', 0) or 0) and g.get('name'): return {'var': g['name']}
-            return objref(g.get('value'))
-        if t == 'FsmEventTarget':
-            d = L('fsmEventTargetParams')[p]
-            g = d.get('gameObject') or {}
-            if int(g.get('ownerOption', 0) or 0) == 0: go = {'owner': True}
+def objref(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    try:
+        file_id = int(value.get("fileID", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+    if not file_id:
+        return None
+    result: dict[str, Any] = {"go": file_id}
+    if value.get("guid"):
+        result["guid"] = value["guid"]
+    return result
+
+
+def fsmvar(value: Any, kind: str) -> Any:
+    if not isinstance(value, dict):
+        return num(value) if kind != "FsmString" else value
+    if int(value.get("useVariable", 0) or 0):
+        return {"var": value["name"]} if value.get("name") else {"none": True}
+    if kind in ("FsmGameObject", "FsmObject", "FsmMaterial", "FsmTexture"):
+        return objref(value.get("value"))
+    raw = value.get("value")
+    if isinstance(raw, dict) and set(raw) <= {"x", "y", "z", "w", "r", "g", "b", "a"}:
+        return {key: num(item) for key, item in raw.items()}
+    return num(raw) if kind != "FsmString" else raw
+
+
+def decode_actions(action_data: Any, paths: Paths) -> list[dict[str, Any]]:
+    del paths
+    if not isinstance(action_data, dict):
+        return []
+    names = action_data.get("actionNames") or []
+    if not names:
+        return []
+    starts = int_list(action_data.get("actionStartIndex"))
+    types = int_list(action_data.get("paramDataType"))
+    positions = int_list(action_data.get("paramDataPos"))
+    sizes = int_list(action_data.get("paramByteDataSize"))
+    param_names = action_data.get("paramName") or []
+    byte_data = hex_bytes(action_data.get("byteData"))
+
+    enabled = action_data.get("actionEnabled")
+    enabled_bytes = (
+        hex_bytes(enabled)
+        if isinstance(enabled, str)
+        else (bytes(enabled) if isinstance(enabled, (bytes, bytearray, list)) else b"")
+    )
+    if not enabled_bytes:
+        enabled_bytes = b"\x01" * len(names)
+    array_sizes = int_list(action_data.get("arrayParamSizes"))
+
+    def list_value(key: str) -> list[Any]:
+        value = action_data.get(key)
+        return value if isinstance(value, list) else []
+
+    def unpack_string(position: int, size: int) -> str:
+        return byte_data[position : position + size].decode("utf-8", "replace")
+
+    def param_type(index: int) -> str:
+        if 0 <= index < len(types):
+            type_index = types[index]
+            if 0 <= type_index < len(PARAM_TYPES):
+                return PARAM_TYPES[type_index]
+            return str(type_index)
+        return "Unsupported"
+
+    def get_param(index: int) -> Any:
+        if index >= len(types) or index >= len(positions) or index >= len(sizes):
+            return {"error": "parameter metadata out of range"}
+        type_name = param_type(index)
+        position = positions[index]
+        size = sizes[index]
+
+        if type_name in ("Integer", "LayerMask", "Enum"):
+            return (
+                struct.unpack_from("<i", byte_data, position)[0]
+                if size >= 4 and position + 4 <= len(byte_data)
+                else 0
+            )
+        if type_name == "Boolean":
+            return (
+                bool(byte_data[position])
+                if size and position < len(byte_data)
+                else False
+            )
+        if type_name == "Float":
+            return (
+                struct.unpack_from("<f", byte_data, position)[0]
+                if size >= 4 and position + 4 <= len(byte_data)
+                else 0.0
+            )
+        if type_name == "String":
+            if size:
+                return unpack_string(position, size)
+            strings = list_value("stringParams")
+            return (
+                strings[position]
+                if 0 <= position < len(strings) and strings[position] is not None
+                else ""
+            )
+        if type_name in (
+            "Vector2",
+            "Vector3",
+            "Vector4",
+            "Color",
+            "Rect",
+            "Quaternion",
+        ):
+            count = size // 4
+            if count and position + size <= len(byte_data):
+                return list(struct.unpack_from(f"<{count}f", byte_data, position))
+            return []
+        if type_name in ("FsmFloat", "FsmInt", "FsmBool"):
+            values_key = {
+                "FsmFloat": "fsmFloatParams",
+                "FsmInt": "fsmIntParams",
+                "FsmBool": "fsmBoolParams",
+            }[type_name]
+            if size:
+                value_size = 4 if type_name != "FsmBool" else 1
+                if position + value_size > len(byte_data):
+                    return None
+                if type_name == "FsmFloat":
+                    raw = struct.unpack_from("<f", byte_data, position)[0]
+                elif type_name == "FsmInt":
+                    raw = struct.unpack_from("<i", byte_data, position)[0]
+                else:
+                    raw = bool(byte_data[position])
+                use_variable = (
+                    byte_data[position + value_size]
+                    if position + value_size < len(byte_data)
+                    else 0
+                )
+                name_start = position + value_size + 1
+                name = (
+                    unpack_string(name_start, max(0, size - (name_start - position)))
+                    if name_start <= len(byte_data)
+                    else ""
+                )
+                return (
+                    {"var": name}
+                    if use_variable and name
+                    else ({"none": True} if use_variable else raw)
+                )
+            values = list_value(values_key)
+            return fsmvar(
+                values[position] if 0 <= position < len(values) else None, type_name
+            )
+        if type_name == "FsmEvent":
+            if size:
+                return {"event": unpack_string(position, size)}
+            strings = list_value("stringParams")
+            event_name = strings[position] if 0 <= position < len(strings) else None
+            return {"event": event_name} if event_name else None
+        if type_name in (
+            "FsmVector2",
+            "FsmVector3",
+            "FsmColor",
+            "FsmQuaternion",
+            "FsmRect",
+        ):
+            count = (
+                2
+                if type_name == "FsmVector2"
+                else (3 if type_name == "FsmVector3" else 4)
+            )
+            if size:
+                if position + 4 * count > len(byte_data):
+                    return []
+                raw = list(struct.unpack_from(f"<{count}f", byte_data, position))
+                use_position = position + 4 * count
+                use_variable = (
+                    byte_data[use_position] if use_position < len(byte_data) else 0
+                )
+                name_start = use_position + 1
+                name = (
+                    unpack_string(name_start, max(0, size - (name_start - position)))
+                    if name_start <= len(byte_data)
+                    else ""
+                )
+                return (
+                    {"var": name}
+                    if use_variable and name
+                    else ({"none": True} if use_variable else raw)
+                )
+            key = {
+                "FsmVector2": "fsmVector2Params",
+                "FsmVector3": "fsmVector3Params",
+                "FsmColor": "fsmColorParams",
+                "FsmRect": "fsmRectParams",
+                "FsmQuaternion": "fsmQuaternionParams",
+            }[type_name]
+            values = list_value(key)
+            return fsmvar(
+                values[position] if 0 <= position < len(values) else None, type_name
+            )
+
+        typed_lists = {
+            "FsmString": "fsmStringParams",
+            "FsmGameObject": "fsmGameObjectParams",
+            "FsmVector3": "fsmVector3Params",
+            "FsmColor": "fsmColorParams",
+            "FsmRect": "fsmRectParams",
+            "FsmQuaternion": "fsmQuaternionParams",
+            "FsmObject": "fsmObjectParams",
+            "FsmMaterial": "fsmObjectParams",
+            "FsmTexture": "fsmObjectParams",
+            "FsmEnum": "fsmEnumParams",
+            "FsmArray": "fsmArrayParams",
+            "FsmVar": "fsmVarParams",
+        }
+        if type_name in typed_lists:
+            values = list_value(typed_lists[type_name])
+            value = values[position] if 0 <= position < len(values) else None
+            if type_name == "FsmVar" and isinstance(value, dict):
+                variable_name = value.get("variableName")
+                if variable_name:
+                    return {"var": variable_name}
+                return {
+                    "type": value.get("type"),
+                    "f": num(value.get("floatValue")),
+                    "i": num(value.get("intValue")),
+                    "b": num(value.get("boolValue")),
+                    "s": value.get("stringValue"),
+                }
+            if type_name == "FsmEnum" and isinstance(value, dict):
+                if int(value.get("useVariable", 0) or 0) and value.get("name"):
+                    return {"var": value["name"]}
+                return num(value.get("intValue"))
+            if type_name == "FsmArray" and isinstance(value, dict):
+                if int(value.get("useVariable", 0) or 0) and value.get("name"):
+                    return {"var": value["name"]}
+                return {
+                    "array": value.get("type"),
+                    "floats": value.get("floatValues"),
+                    "ints": value.get("intValues"),
+                    "strings": value.get("stringValues"),
+                    "bools": value.get("boolValues"),
+                }
+            return fsmvar(value, type_name)
+        if type_name == "FsmOwnerDefault":
+            values = list_value("fsmOwnerDefaultParams")
+            value = values[position] if 0 <= position < len(values) else {}
+            if int(value.get("ownerOption", 0) or 0) == 0:
+                return {"owner": True}
+            game_object = value.get("gameObject") or {}
+            if int(game_object.get("useVariable", 0) or 0) and game_object.get("name"):
+                return {"var": game_object["name"]}
+            return objref(game_object.get("value"))
+        if type_name == "FsmEventTarget":
+            values = list_value("fsmEventTargetParams")
+            value = values[position] if 0 <= position < len(values) else {}
+            game_object = value.get("gameObject") or {}
+            if int(game_object.get("ownerOption", 0) or 0) == 0:
+                target = {"owner": True}
             else:
-                gg = g.get('gameObject') or {}
-                go = {'var': gg['name']} if int(gg.get('useVariable', 0) or 0) and gg.get('name') else objref(gg.get('value'))
-            fn = d.get('fsmName') or {}
-            return {'target': num(d.get('target')), 'fsmName': ({'var': fn['name']} if int(fn.get('useVariable', 0) or 0) and fn.get('name') else fn.get('value')),
-                    'go': go, 'children': bool(num((d.get('sendToChildren') or {}).get('value') or 0)),
-                    'exclude': bool(num((d.get('excludeSelf') or {}).get('value') or 0))}
-        if t == 'FsmProperty':
-            d = L('fsmPropertyParams')[p]; return {'property': d.get('PropertyName'), 'target': d.get('TargetObject')}
-        if t == 'FunctionCall':
-            d = L('functionCallParams')[p]
-            pt = d.get('parameterType') or d.get('ParameterType')
-            key = {'int': 'IntParameter', 'float': 'FloatParameter', 'bool': 'BoolParameter', 'string': 'StringParameter',
-                   'GameObject': 'GameObjectParameter', 'Vector2': 'Vector2Parameter', 'Vector3': 'Vector3Parameter'}.get(str(pt))
-            v = None
+                nested = game_object.get("gameObject") or {}
+                target = (
+                    {"var": nested["name"]}
+                    if int(nested.get("useVariable", 0) or 0) and nested.get("name")
+                    else objref(nested.get("value"))
+                )
+            fsm_name = value.get("fsmName") or {}
+            return {
+                "target": num(value.get("target")),
+                "fsmName": (
+                    {"var": fsm_name["name"]}
+                    if int(fsm_name.get("useVariable", 0) or 0) and fsm_name.get("name")
+                    else fsm_name.get("value")
+                ),
+                "go": target,
+                "children": bool(
+                    num((value.get("sendToChildren") or {}).get("value") or 0)
+                ),
+                "exclude": bool(
+                    num((value.get("excludeSelf") or {}).get("value") or 0)
+                ),
+            }
+        if type_name == "FsmProperty":
+            values = list_value("fsmPropertyParams")
+            value = values[position] if 0 <= position < len(values) else {}
+            return {
+                "property": value.get("PropertyName"),
+                "target": value.get("TargetObject"),
+            }
+        if type_name == "FunctionCall":
+            values = list_value("functionCallParams")
+            value = values[position] if 0 <= position < len(values) else {}
+            parameter_type = value.get("parameterType") or value.get("ParameterType")
+            key = {
+                "int": "IntParameter",
+                "float": "FloatParameter",
+                "bool": "BoolParameter",
+                "string": "StringParameter",
+                "GameObject": "GameObjectParameter",
+                "Vector2": "Vector2Parameter",
+                "Vector3": "Vector3Parameter",
+            }.get(str(parameter_type))
+            decoded = None
             if key:
-                q = d.get(key) or {}
-                if int(q.get('useVariable', 0) or 0) and q.get('name'): v = {'var': q['name']}
-                elif key == 'GameObjectParameter': v = objref(q.get('value'))
-                else: v = q.get('value')
-                if isinstance(v, str) and key in ('IntParameter', 'FloatParameter', 'BoolParameter'): v = num(v)
-            return {'function': d.get('FunctionName'), 'type': pt, 'v': v, 'f': num((d.get('FloatParameter') or {}).get('value')), 's': (d.get('StringParameter') or {}).get('value')}
-        if t == 'ObjectReference':
-            lst = L('unityObjectParams'); d = lst[p] if p < len(lst) else None
-            return objref(d)
-        if t == 'AnimationCurve' or t == 'FsmAnimationCurve':
-            lst = L('animationCurveParams'); d = lst[p] if p < len(lst) else None
-            return {'curve': d}
-        return {'unsupported': t}
-    out = []
-    for ai, nm in enumerate(names):
-        e = starts[ai + 1] if ai + 1 < len(names) else len(types)
-        params = {}
-        k = starts[ai]
-        while k < e:
-            t = PT[types[k]] if 0 <= types[k] < len(PT) else str(types[k])
-            pname = pnames[k] if k < len(pnames) else str(k)
-            if t == 'Array':
-                n = arr_sizes[pos[k]] if pos[k] < len(arr_sizes) else 0
-                params[pname] = [one(k + 1 + j) for j in range(n)]
-                k += 1 + n; continue
-            try: params[pname] = one(k)
-            except Exception as ex: params[pname] = {'error': str(ex)}
-            k += 1
-        out.append({'type': nm.split('.')[-1], 'enabled': bool(en[ai]) if ai < len(en) else True, 'params': params})
-    return out
+                parameter = value.get(key) or {}
+                if int(parameter.get("useVariable", 0) or 0) and parameter.get("name"):
+                    decoded = {"var": parameter["name"]}
+                elif key == "GameObjectParameter":
+                    decoded = objref(parameter.get("value"))
+                else:
+                    decoded = parameter.get("value")
+                if isinstance(decoded, str) and key in (
+                    "IntParameter",
+                    "FloatParameter",
+                    "BoolParameter",
+                ):
+                    decoded = num(decoded)
+            return {
+                "function": value.get("FunctionName"),
+                "type": parameter_type,
+                "v": decoded,
+                "f": num((value.get("FloatParameter") or {}).get("value")),
+                "s": (value.get("StringParameter") or {}).get("value"),
+            }
+        if type_name == "ObjectReference":
+            values = list_value("unityObjectParams")
+            return objref(values[position] if 0 <= position < len(values) else None)
+        if type_name in ("AnimationCurve", "FsmAnimationCurve"):
+            values = list_value("animationCurveParams")
+            return {"curve": values[position] if 0 <= position < len(values) else None}
+        return {"unsupported": type_name}
 
-_TEMPLATES = None
-_TEMPLATE_FSM = {}
-def template_fsm(guid):
-    """The FSM of a PlayMaker template asset (data/fsm_templates.json maps the guid; tools/fsm_templates.py)."""
-    global _TEMPLATES
-    if _TEMPLATES is None:
-        tp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'fsm_templates.json')
-        _TEMPLATES = json.load(open(tp)) if os.path.exists(tp) else {}
-    path = _TEMPLATES.get(guid)
-    if not path: return None, None
-    if path not in _TEMPLATE_FSM:
+    result = []
+    for action_index, name in enumerate(names):
+        start = starts[action_index] if action_index < len(starts) else 0
+        end = starts[action_index + 1] if action_index + 1 < len(starts) else len(types)
+        params: dict[str, Any] = {}
+        index = start
+        while index < end:
+            parameter_name = (
+                param_names[index] if index < len(param_names) else str(index)
+            )
+            type_name = param_type(index)
+            if type_name == "Array":
+                position = positions[index] if index < len(positions) else -1
+                array_size = (
+                    array_sizes[position] if 0 <= position < len(array_sizes) else 0
+                )
+                params[parameter_name] = []
+                for offset in range(array_size):
+                    item_index = index + 1 + offset
+                    if item_index < end:
+                        try:
+                            params[parameter_name].append(get_param(item_index))
+                        except (IndexError, struct.error, ValueError) as error:
+                            params[parameter_name].append({"error": str(error)})
+                index += 1 + array_size
+                continue
+            try:
+                params[parameter_name] = get_param(index)
+            except (IndexError, struct.error, ValueError) as error:
+                params[parameter_name] = {"error": str(error)}
+            index += 1
+        result.append(
+            {
+                "type": str(name).split(".")[-1],
+                "enabled": (
+                    bool(enabled_bytes[action_index])
+                    if action_index < len(enabled_bytes)
+                    else True
+                ),
+                "params": params,
+            }
+        )
+    return result
+
+
+_templates: dict[str, str] | None = None
+_template_fsms: dict[str, tuple[dict[str, Any] | None, Paths | None]] = {}
+
+
+def template_path(guid: str) -> str | None:
+    global _templates
+    if _templates is None:
+        mapping_path = Path(__file__).resolve().parent / "data" / "fsm_templates.json"
+        if not mapping_path.exists():
+            _templates = {}
+        else:
+            try:
+                _templates = json.loads(mapping_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as error:
+                print(
+                    f"Warning: cannot read template mapping: {error}", file=sys.stderr
+                )
+                _templates = {}
+    mapping = _templates.get(guid)
+    if not mapping:
+        return None
+    normalized = mapping.replace("\\", "/")
+    candidates: list[Path] = []
+    mapping_path = Path(mapping)
+    if mapping_path.is_absolute():
+        candidates.append(mapping_path)
+    if normalized.startswith("hkdata/"):
+        candidates.append(Path(ROOT) / normalized[len("hkdata/") :])
+    if normalized.startswith("ex/"):
+        candidates.append(Path(ROOT) / normalized)
+    candidates.append(Path(__file__).resolve().parent.parent / normalized)
+    candidates.append(Path(mapping))
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def template_fsm(guid: str) -> tuple[dict[str, Any] | None, Paths | None]:
+    path = template_path(guid)
+    if not path:
+        return None, None
+    if path not in _template_fsms:
         objs = load_objs(path)
-        _TEMPLATE_FSM[path] = next(((v['fsm'], Paths(objs)) for k, (t, v) in objs.items() if isinstance(v.get('fsm'), dict)), (None, None))
-    return _TEMPLATE_FSM[path]
+        paths = Paths(objs)
+        fsm = next(
+            (
+                value.get("fsm")
+                for _, (type_name, value) in objs.items()
+                if type_name == "MonoBehaviour" and isinstance(value.get("fsm"), dict)
+            ),
+            None,
+        )
+        _template_fsms[path] = (fsm, paths)
+    return _template_fsms[path]
 
-def decode_fsm(v, P, path):
-    f = v['fsm']
-    tg = (v.get('fsmTemplate') or {}).get('guid')
-    if tg:      # a templated FSM: the template's states, events and start state with this component's variable values
-        tf, tP = template_fsm(tg)
-        if tf:
-            merged = dict(tf); merged['name'] = f.get('name'); merged['variables'] = f.get('variables') or tf.get('variables')
-            if 'RestartOnEnable' in f: merged['RestartOnEnable'] = f['RestartOnEnable']
-            f = merged; P = tP or P
-    vars_ = {}
-    V = f.get('variables') or {}
-    for key, kind in (('floatVariables', 'float'), ('intVariables', 'int'), ('boolVariables', 'bool'), ('stringVariables', 'string'),
-                      ('vector2Variables', 'vector2'), ('vector3Variables', 'vector3'), ('gameObjectVariables', 'gameobject'),
-                      ('objectVariables', 'object'), ('colorVariables', 'color'), ('enumVariables', 'enum'), ('arrayVariables', 'array')):
-        for d in V.get(key) or []:
-            val = d.get('value')
-            if kind in ('gameobject', 'object'): val = objref(val)
-            elif kind in ('float', 'int'): val = num(val)
-            elif kind == 'bool': val = bool(int(val or 0))
-            elif isinstance(val, dict): val = {k: num(x) for k, x in val.items() if not isinstance(x, dict)}
-            elif kind == 'enum': val = num(d.get('intValue'))
-            vars_[d['name']] = {'type': kind, 'value': val}
+
+def decode_fsm(
+    component: dict[str, Any], paths: Paths, owner_path: str
+) -> dict[str, Any]:
+    fsm = component.get("fsm")
+    if not isinstance(fsm, dict):
+        raise ValueError("component does not contain an FSM")
+    template_guid = (component.get("fsmTemplate") or {}).get("guid")
+    if template_guid:
+        template, template_paths = template_fsm(template_guid)
+        if template:
+            merged = dict(template)
+            merged["name"] = fsm.get("name")
+            merged["variables"] = fsm.get("variables") or template.get("variables")
+            if "RestartOnEnable" in fsm:
+                merged["RestartOnEnable"] = fsm["RestartOnEnable"]
+            fsm = merged
+            if template_paths:
+                paths = template_paths
+
+    variables: dict[str, Any] = {}
+    variable_data = fsm.get("variables") or {}
+    variable_kinds = (
+        ("floatVariables", "float"),
+        ("intVariables", "int"),
+        ("boolVariables", "bool"),
+        ("stringVariables", "string"),
+        ("vector2Variables", "vector2"),
+        ("vector3Variables", "vector3"),
+        ("gameObjectVariables", "gameobject"),
+        ("objectVariables", "object"),
+        ("colorVariables", "color"),
+        ("enumVariables", "enum"),
+        ("arrayVariables", "array"),
+    )
+    for key, kind in variable_kinds:
+        for variable in variable_data.get(key) or []:
+            if not isinstance(variable, dict) or not variable.get("name"):
+                continue
+            raw = variable.get("value")
+            if kind in ("gameobject", "object"):
+                raw = objref(raw)
+            elif kind in ("float", "int"):
+                raw = num(raw)
+            elif kind == "bool":
+                try:
+                    raw = bool(int(raw or 0))
+                except (TypeError, ValueError):
+                    raw = bool(raw)
+            elif kind == "enum":
+                raw = num(variable.get("intValue"))
+            elif isinstance(raw, dict):
+                raw = {
+                    item_key: num(item)
+                    for item_key, item in raw.items()
+                    if not isinstance(item, dict)
+                }
+            variables[variable["name"]] = {"type": kind, "value": raw}
+
     states = []
-    for st in f.get('states') or []:
-        states.append({'name': st['name'],
-                       'transitions': [{'event': (t.get('fsmEvent') or {}).get('name'), 'to': t.get('toState')} for t in st.get('transitions') or []],
-                       'actions': decode_actions(st['actionData'], P)})
-    return {'fsm': f.get('name'), 'owner': path, 'start': f.get('startState'), 'restart': int(f.get('RestartOnEnable', 1) or 0) if 'RestartOnEnable' in f else 1,
-            'events': [e.get('name') for e in f.get('events') or []],
-            'global': [{'event': (t.get('fsmEvent') or {}).get('name'), 'to': t.get('toState')} for t in f.get('globalTransitions') or []],
-            'variables': vars_, 'states': states}
+    for state in fsm.get("states") or []:
+        if not isinstance(state, dict):
+            continue
+        transitions = []
+        for transition in state.get("transitions") or []:
+            if isinstance(transition, dict):
+                event = transition.get("fsmEvent") or {}
+                transitions.append(
+                    {"event": event.get("name"), "to": transition.get("toState")}
+                )
+        states.append(
+            {
+                "name": state.get("name"),
+                "transitions": transitions,
+                "actions": decode_actions(state.get("actionData"), paths),
+            }
+        )
+    global_transitions = []
+    for transition in fsm.get("globalTransitions") or []:
+        if isinstance(transition, dict):
+            event = transition.get("fsmEvent") or {}
+            global_transitions.append(
+                {"event": event.get("name"), "to": transition.get("toState")}
+            )
+    return {
+        "fsm": fsm.get("name"),
+        "owner": owner_path,
+        "start": fsm.get("startState"),
+        "restart": (
+            int(fsm.get("RestartOnEnable", 1) or 0) if "RestartOnEnable" in fsm else 1
+        ),
+        "events": [
+            event.get("name")
+            for event in fsm.get("events") or []
+            if isinstance(event, dict)
+        ],
+        "global": global_transitions,
+        "variables": variables,
+        "states": states,
+    }
 
-def extract(path, filt=None):
-    objs = load_objs(path); P = Paths(objs)
-    out = []
-    for fid, (t, v) in objs.items():
-        if t != 'MonoBehaviour' or not isinstance(v, dict) or not isinstance(v.get('fsm'), dict) or 'states' not in v['fsm']: continue
-        gid = int(v['m_GameObject']['fileID']); p = P.path(gid)
-        if filt and filt not in p: continue
-        d = decode_fsm(v, P, p); d['gid'] = gid
-        out.append(d)
-    return out, P
 
-if __name__ == '__main__':
-    res, P = extract(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
-    json.dump(res, sys.stdout, indent=1, default=str)
+def extract(path: str, filt: str | None = None) -> tuple[list[dict[str, Any]], Paths]:
+    objs = load_objs(path)
+    paths = Paths(objs)
+    result = []
+    for file_id, (type_name, value) in objs.items():
+        del file_id
+        if type_name != "MonoBehaviour" or not isinstance(value, dict):
+            continue
+        fsm = value.get("fsm")
+        if not isinstance(fsm, dict) or "states" not in fsm:
+            continue
+        game_object = value.get("m_GameObject") or {}
+        try:
+            gid = int(game_object.get("fileID", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        owner_path = paths.path(gid)
+        if filt and filt not in owner_path:
+            continue
+        decoded = decode_fsm(value, paths, owner_path)
+        decoded["gid"] = gid
+        result.append(decoded)
+    return result, paths
+
+
+def main(argv: Iterable[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Decode PlayMaker FSM components from AssetRipper YAML"
+    )
+    parser.add_argument("path", help="scene, prefab, or MonoBehaviour asset")
+    parser.add_argument(
+        "filter", nargs="?", help="only include owner paths containing this text"
+    )
+    parser.add_argument(
+        "--indent", type=int, default=1, help="JSON indentation (default: 1)"
+    )
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    if not os.path.isfile(args.path):
+        parser.error(f"input file does not exist: {args.path}")
+    try:
+        result, _ = extract(args.path, args.filter)
+    except Exception as error:
+        print(f"Error decoding {args.path}: {error}", file=sys.stderr)
+        return 1
+    json.dump(result, sys.stdout, indent=args.indent, ensure_ascii=False, default=str)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

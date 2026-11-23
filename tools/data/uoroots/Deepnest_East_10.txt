@@ -1,6 +1,0 @@
-Ghost Warrior NPC
-Dream Gate
-Warrior
-Inspect Region Ghost
-left1
-_SceneManager

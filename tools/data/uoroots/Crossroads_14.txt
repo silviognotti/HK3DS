@@ -1,6 +1,0 @@
-Scuttler Spawn 1 (2)
-Infected Parent
-_Scenery/scenery details1/statue_09/Crossroads Statue Horn S
-_Scenery/scenery details1/statue_08/Crossroads Statue Horn S
-Noninfected Parent
-_SceneManager

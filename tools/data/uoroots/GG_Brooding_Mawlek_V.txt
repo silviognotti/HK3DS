@@ -1,3 +1,0 @@
-GG_Arena_Prefab
-Boss Scene Controller
-Battle Scene

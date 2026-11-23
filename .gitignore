@@ -26,3 +26,18 @@ previews/
 host/hk3ds_host*
 tools/__pycache__/
 __pycache__/
+# tool output written next to the tools
+/hkdata/
+/obj/
+/.idea/
+/.env
+/tools/data/fsm_templates.json
+/tools/data/all_rooms.txt
+/tools/data/audio_map.json
+/tools/data/cs_sigs.json
+/tools/data/script_guids.json
+/tools/data/particle_textures.json
+/tools/data/gg_statues.txt
+/tools/data/music_cues.txt
+/tools/data/uoroots/
+/hk3ds_std.romfs

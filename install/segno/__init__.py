@@ -9,20 +9,37 @@ QR Code and Micro QR Code implementation.
 
 "QR Code" and "Micro QR Code" are registered trademarks of DENSO WAVE INCORPORATED.
 """
+
 import sys
 import io
 from . import encoder
 from .encoder import DataOverflowError
 from . import writers, utils
 
-__version__ = '1.6.7.dev'
+__version__ = "1.6.7.dev"
 
-__all__ = ('make', 'make_qr', 'make_micro', 'make_sequence', 'QRCode',
-           'QRCodeSequence', 'DataOverflowError')
+__all__ = (
+    "make",
+    "make_qr",
+    "make_micro",
+    "make_sequence",
+    "QRCode",
+    "QRCodeSequence",
+    "DataOverflowError",
+)
 
 
-def make(content, error=None, version=None, mode=None, mask=None, encoding=None,
-         eci=False, micro=None, boost_error=True):
+def make(
+    content,
+    error=None,
+    version=None,
+    mode=None,
+    mask=None,
+    encoding=None,
+    eci=False,
+    micro=None,
+    boost_error=True,
+):
     """\
     Creates a (Micro) QR Code.
 
@@ -135,12 +152,31 @@ def make(content, error=None, version=None, mode=None, mask=None, encoding=None,
              the provided :paramref:`version`.
     :rtype: QRCode
     """
-    return QRCode(encoder.encode(content, error, version, mode, mask, encoding,
-                                 eci, micro, boost_error=boost_error))
+    return QRCode(
+        encoder.encode(
+            content,
+            error,
+            version,
+            mode,
+            mask,
+            encoding,
+            eci,
+            micro,
+            boost_error=boost_error,
+        )
+    )
 
 
-def make_qr(content, error=None, version=None, mode=None, mask=None,
-            encoding=None, eci=False, boost_error=True):
+def make_qr(
+    content,
+    error=None,
+    version=None,
+    mode=None,
+    mask=None,
+    encoding=None,
+    eci=False,
+    boost_error=True,
+):
     """\
     Creates a QR code (never a Micro QR code).
 
@@ -148,12 +184,28 @@ def make_qr(content, error=None, version=None, mode=None, mask=None,
 
     :rtype: QRCode
     """
-    return make(content, error=error, version=version, mode=mode, mask=mask,
-                encoding=encoding, eci=eci, micro=False, boost_error=boost_error)
+    return make(
+        content,
+        error=error,
+        version=version,
+        mode=mode,
+        mask=mask,
+        encoding=encoding,
+        eci=eci,
+        micro=False,
+        boost_error=boost_error,
+    )
 
 
-def make_micro(content, error=None, version=None, mode=None, mask=None,
-               encoding=None, boost_error=True):
+def make_micro(
+    content,
+    error=None,
+    version=None,
+    mode=None,
+    mask=None,
+    encoding=None,
+    boost_error=True,
+):
     """\
     Creates a Micro QR code.
 
@@ -164,12 +216,28 @@ def make_micro(content, error=None, version=None, mode=None, mask=None,
 
     :rtype: QRCode
     """
-    return make(content, error=error, version=version, mode=mode, mask=mask,
-                encoding=encoding, micro=True, boost_error=boost_error)
+    return make(
+        content,
+        error=error,
+        version=version,
+        mode=mode,
+        mask=mask,
+        encoding=encoding,
+        micro=True,
+        boost_error=boost_error,
+    )
 
 
-def make_sequence(content, error=None, version=None, mode=None, mask=None,
-                  encoding=None, boost_error=True, symbol_count=None):
+def make_sequence(
+    content,
+    error=None,
+    version=None,
+    mode=None,
+    mask=None,
+    encoding=None,
+    boost_error=True,
+    symbol_count=None,
+):
     """\
     Creates a sequence of QR codes using the Structured Append mode.
 
@@ -200,20 +268,29 @@ def make_sequence(content, error=None, version=None, mode=None, mask=None,
     :param int symbol_count: Number of symbols.
     :rtype: QRCodeSequence
     """
-    return QRCodeSequence(map(QRCode,
-                              encoder.encode_sequence(content, error=error,
-                                                      version=version,
-                                                      mode=mode, mask=mask,
-                                                      encoding=encoding,
-                                                      boost_error=boost_error,
-                                                      symbol_count=symbol_count)))
+    return QRCodeSequence(
+        map(
+            QRCode,
+            encoder.encode_sequence(
+                content,
+                error=error,
+                version=version,
+                mode=mode,
+                mask=mask,
+                encoding=encoding,
+                boost_error=boost_error,
+                symbol_count=symbol_count,
+            ),
+        )
+    )
 
 
 class QRCode:
     """\
     Represents a (Micro) QR Code.
     """
-    __slots__ = ('_error', '_matrix_size', '_mode', '_version', 'mask', 'matrix')
+
+    __slots__ = ("_error", "_matrix_size", "_mode", "_version", "mask", "matrix")
 
     def __init__(self, code):
         """\
@@ -282,7 +359,7 @@ class QRCode:
         :rtype: str
         """
         version = str(self.version)
-        return '-'.join((version, self.error) if self.error else (version,))
+        return "-".join((version, self.error) if self.error else (version,))
 
     @property
     def default_border_size(self):
@@ -377,8 +454,9 @@ class QRCode:
         iterfn = utils.matrix_iter_verbose if verbose else utils.matrix_iter
         return iterfn(self.matrix, self._matrix_size, scale, border)
 
-    def show(self, delete_after=20, scale=10, border=None, dark='#000',
-             light='#fff'):  # pragma: no cover
+    def show(
+        self, delete_after=20, scale=10, border=None, dark="#000", light="#fff"
+    ):  # pragma: no cover
         """\
         Displays this QR code.
 
@@ -420,7 +498,7 @@ class QRCode:
             except OSError:
                 pass
 
-        f = tempfile.NamedTemporaryFile('wb', suffix='.png', delete=False)
+        f = tempfile.NamedTemporaryFile("wb", suffix=".png", delete=False)
         try:
             self.save(f, scale=scale, dark=dark, light=light, border=border)
         except:
@@ -428,13 +506,14 @@ class QRCode:
             os.unlink(f.name)
             raise
         f.close()
-        webbrowser.open_new_tab(urljoin('file:', pathname2url(f.name)))
+        webbrowser.open_new_tab(urljoin("file:", pathname2url(f.name)))
         if delete_after is not None:
             t = threading.Thread(target=delete_file, args=(f.name,))
             t.start()
 
-    def svg_data_uri(self, xmldecl=False, encode_minimal=False,
-                     omit_charset=False, nl=False, **kw):
+    def svg_data_uri(
+        self, xmldecl=False, encode_minimal=False, omit_charset=False, nl=False, **kw
+    ):
         """\
         Converts the QR code into an SVG data URI.
 
@@ -465,10 +544,15 @@ class QRCode:
                         (default: ``False``)
         :rtype: str
         """
-        return writers.as_svg_data_uri(self.matrix, self._matrix_size,
-                                       xmldecl=xmldecl, nl=nl,
-                                       encode_minimal=encode_minimal,
-                                       omit_charset=omit_charset, **kw)
+        return writers.as_svg_data_uri(
+            self.matrix,
+            self._matrix_size,
+            xmldecl=xmldecl,
+            nl=nl,
+            encode_minimal=encode_minimal,
+            omit_charset=omit_charset,
+            **kw,
+        )
 
     def svg_inline(self, **kw):
         """\
@@ -496,8 +580,8 @@ class QRCode:
         :rtype: str
         """
         buff = io.BytesIO()
-        self.save(buff, kind='svg', xmldecl=False, svgns=False, nl=False, **kw)
-        return buff.getvalue().decode(kw.get('encoding', 'utf-8'))
+        self.save(buff, kind="svg", xmldecl=False, svgns=False, nl=False, **kw)
+        return buff.getvalue().decode(kw.get("encoding", "utf-8"))
 
     def png_data_uri(self, **kw):
         """\
@@ -528,8 +612,10 @@ class QRCode:
                 (default: ``False``).
         """
         if compact:
-            writers.write_terminal_compact(self.matrix, self._matrix_size, out or sys.stdout, border)
-        elif out is None and sys.platform == 'win32':  # pragma: no cover
+            writers.write_terminal_compact(
+                self.matrix, self._matrix_size, out or sys.stdout, border
+            )
+        elif out is None and sys.platform == "win32":  # pragma: no cover
             # Windows < 10 does not support ANSI escape sequences, try to
             # call the a Windows specific terminal output which uses the
             # Windows API.
@@ -537,9 +623,13 @@ class QRCode:
                 writers.write_terminal_win(self.matrix, self._matrix_size, border)
             except OSError:
                 # Use the standard output even if it may print garbage
-                writers.write_terminal(self.matrix, self._matrix_size, sys.stdout, border)
+                writers.write_terminal(
+                    self.matrix, self._matrix_size, sys.stdout, border
+                )
         else:
-            writers.write_terminal(self.matrix, self._matrix_size, out or sys.stdout, border)
+            writers.write_terminal(
+                self.matrix, self._matrix_size, out or sys.stdout, border
+            )
 
     def save(self, out, kind=None, **kw):
         """\
@@ -948,7 +1038,7 @@ class QRCode:
         If such a plugin exists, a callable function is returned. The result
         of invoking the function depends on the plugin.
         """
-        if name.startswith('to_'):
+        if name.startswith("to_"):
             try:
                 # Try to use the 3rd party lib first. This is required for
                 # Python versions < 3.10
@@ -956,11 +1046,13 @@ class QRCode:
             except ImportError:
                 from importlib import metadata
             from functools import partial
-            for ep in metadata.entry_points(group='segno.plugin.converter',
-                                            name=name[3:]):
+
+            for ep in metadata.entry_points(
+                group="segno.plugin.converter", name=name[3:]
+            ):
                 plugin = ep.load()
                 return partial(plugin, self)
-        raise AttributeError(f'{self.__class__} object has no attribute {name}')
+        raise AttributeError(f"{self.__class__} object has no attribute {name}")
 
 
 class QRCodeSequence(tuple):
@@ -969,6 +1061,7 @@ class QRCodeSequence(tuple):
 
     Iff this sequence contains only one item, it behaves like :py:class:`QRCode`.
     """
+
     __slots__ = ()
 
     def __new__(cls, qrcodes):
@@ -1001,9 +1094,9 @@ class QRCodeSequence(tuple):
         filename = lambda o, n: o  # noqa: E731
         m = len(self)
         if m > 1 and isinstance(out, str):
-            dot_idx = out.rfind('.')
+            dot_idx = out.rfind(".")
             if dot_idx > -1:
-                out = out[:dot_idx] + '-{0:02d}-{1:02d}' + out[dot_idx:]
+                out = out[:dot_idx] + "-{0:02d}-{1:02d}" + out[dot_idx:]
                 filename = lambda o, n: o.format(m, n)  # noqa: E731
         for n, qrcode in enumerate(self, start=1):
             qrcode.save(filename(out, n), kind=kind, **kw)

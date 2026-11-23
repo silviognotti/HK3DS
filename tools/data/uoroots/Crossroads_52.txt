@@ -1,8 +1,0 @@
-Goam Inspect
-Geo Rock 1
-Geo Rock 2
-left1
-Darkness Region
-Crossroads Statue Small
-Quake Floor
-_SceneManager

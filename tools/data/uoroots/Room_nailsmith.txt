@@ -1,5 +1,0 @@
-Nailsmith
-Nailsmith Leave Audio
-_Scenery/room_nailsmith_bg 13
-Scene Blanker
-_SceneManager

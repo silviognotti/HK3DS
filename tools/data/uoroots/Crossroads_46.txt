@@ -1,9 +1,0 @@
-Tram Call Box
-_Props/Geo Rock 1
-Enviro Region
-Tram Main
-station_pole/Stag_Pole_Tall_Break (2)
-Uninfected Parent
-Infected_Parent
-_SceneManager
-Tram Station Check

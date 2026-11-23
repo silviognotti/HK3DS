@@ -1,5 +1,0 @@
-Mantis Battle
-Shot Mantis Lord
-Boss Scene Controller
-GG_Arena_Prefab
-_SceneManager

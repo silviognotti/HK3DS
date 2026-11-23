@@ -1,8 +1,0 @@
-Flamebearer Spawn
-Mines Short Shelf 1
-crystal_barrel
-crystal_barrel_03
-crystal_barrel_02/mines_cryst_barrel_short
-mine_globe_01
-mine_globe_01 (1)
-_SceneManager

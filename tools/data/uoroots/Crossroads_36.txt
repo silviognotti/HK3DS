@@ -1,9 +1,0 @@
-_Props/Soul Totem 4
-_Props/Geo Rock 1
-_Scenery/scenery_detail_5/statue_07/Crossroads Statue Horned
-Reminder Look Down
-Force Hard Landing
-_Scenery/scenery_detail_5/statue_06/Crossroads Statue Small
-_Props/Collapser Small
-_Props/Collapser Small 1
-_SceneManager

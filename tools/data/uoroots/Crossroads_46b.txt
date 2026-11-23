@@ -1,8 +1,0 @@
-Tram Call Box
-right1
-Enviro Region
-Tram Main
-station_pole/Stag_Pole_Tall_Break (2)
-_SceneManager
-Resting_Grounds_Shift_Set/PreDreamnail
-Tram Station Check

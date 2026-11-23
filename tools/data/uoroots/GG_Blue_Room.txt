@@ -1,5 +1,0 @@
-gg_blue_core
-health plant 02 break
-health plant 01 break
-GG_Arena_Prefab/Darkness Region
-left1

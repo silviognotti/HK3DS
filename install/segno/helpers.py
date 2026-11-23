@@ -14,23 +14,23 @@ To create a (Micro) QR code which should use a specific error correction level
 or version etc., use the "_data" factory functions which return a string which
 can be used as input for :py:func:`segno.make()`.
 """
+
 import re
 import decimal
 import segno
 from urllib.parse import quote
 
-
 _MECARD_ESCAPE = {
-    ord('\\'): "\\\\",
-    ord(';'): "\\;",
-    ord(':'): "\\:",
+    ord("\\"): "\\\\",
+    ord(";"): "\\;",
+    ord(":"): "\\:",
     ord('"'): '\\"',
 }
 
 
 _VCARD_ESCAPE = {
-    ord(','): '\\,',
-    ord(';'): '\\;',
+    ord(","): "\\,",
+    ord(";"): "\\;",
 }
 
 
@@ -70,13 +70,13 @@ def make_wifi_data(ssid, password=None, security=None, hidden=False):
     :rtype: str
     """
     escape = _escape_mecard
-    data = 'WIFI:'
+    data = "WIFI:"
     if security:
         data += f'T:{security.upper() if security != "nopass" else security};'
-    data += f'S:{escape(ssid)};'
+    data += f"S:{escape(ssid)};"
     if password is not None:
-        data += f'P:{escape(password)};'
-    data += 'H:true;' if hidden else ';'
+        data += f"P:{escape(password)};"
+    data += "H:true;" if hidden else ";"
     return data
 
 
@@ -98,10 +98,24 @@ def make_wifi(ssid, password=None, security=None, hidden=False):
     return segno.make_qr(make_wifi_data(ssid, password, security, hidden))
 
 
-def make_mecard_data(name, reading=None, email=None, phone=None, videophone=None,
-                     memo=None, nickname=None, birthday=None, url=None,
-                     pobox=None, roomno=None, houseno=None, city=None,
-                     prefecture=None, zipcode=None, country=None):
+def make_mecard_data(
+    name,
+    reading=None,
+    email=None,
+    phone=None,
+    videophone=None,
+    memo=None,
+    nickname=None,
+    birthday=None,
+    url=None,
+    pobox=None,
+    roomno=None,
+    houseno=None,
+    city=None,
+    prefecture=None,
+    zipcode=None,
+    country=None,
+):
     """\
     Creates a string encoding the contact information as MeCard.
 
@@ -139,43 +153,58 @@ def make_mecard_data(name, reading=None, email=None, phone=None, videophone=None
     :type country: str or None
     :rtype: str
     """
+
     def make_multifield(name, val):
         if not val:
             return ()
         if isinstance(val, str):
             val = (val,)
-        return [f'{name}:{escape(i)};' for i in val]
+        return [f"{name}:{escape(i)};" for i in val]
 
     escape = _escape_mecard
-    data = [f'MECARD:N:{escape(name)};']
+    data = [f"MECARD:N:{escape(name)};"]
     if reading:
-        data.append(f'SOUND:{escape(reading)};')
-    data.extend(make_multifield('TEL', phone))
-    data.extend(make_multifield('TELAV', videophone))
-    data.extend(make_multifield('EMAIL', email))
+        data.append(f"SOUND:{escape(reading)};")
+    data.extend(make_multifield("TEL", phone))
+    data.extend(make_multifield("TELAV", videophone))
+    data.extend(make_multifield("EMAIL", email))
     if nickname:
-        data.append(f'NICKNAME:{escape(nickname)};')
+        data.append(f"NICKNAME:{escape(nickname)};")
     if birthday:
         try:
-            birthday = birthday.strftime('%Y%m%d')
+            birthday = birthday.strftime("%Y%m%d")
         except AttributeError:
             pass
-        data.append(f'BDAY:{birthday};')
-    data.extend(make_multifield('URL', url))
+        data.append(f"BDAY:{birthday};")
+    data.extend(make_multifield("URL", url))
     adr_properties = (pobox, roomno, houseno, city, prefecture, zipcode, country)
     if any(adr_properties):
-        adr_data = [escape(i or '') for i in adr_properties]
-        data.append('ADR:{0},{1},{2},{3},{4},{5},{6};'.format(*adr_data))  # noqa UP030
+        adr_data = [escape(i or "") for i in adr_properties]
+        data.append("ADR:{0},{1},{2},{3},{4},{5},{6};".format(*adr_data))  # noqa UP030
     if memo:
-        data.append(f'MEMO:{escape(memo)};')
-    data.append(';')
-    return ''.join(data)
+        data.append(f"MEMO:{escape(memo)};")
+    data.append(";")
+    return "".join(data)
 
 
-def make_mecard(name, reading=None, email=None, phone=None, videophone=None,
-                memo=None, nickname=None, birthday=None, url=None, pobox=None,
-                roomno=None, houseno=None, city=None, prefecture=None,
-                zipcode=None, country=None):
+def make_mecard(
+    name,
+    reading=None,
+    email=None,
+    phone=None,
+    videophone=None,
+    memo=None,
+    nickname=None,
+    birthday=None,
+    url=None,
+    pobox=None,
+    roomno=None,
+    houseno=None,
+    city=None,
+    prefecture=None,
+    zipcode=None,
+    country=None,
+):
     """\
     Returns a QR code which encodes a `MeCard <https://en.wikipedia.org/wiki/MeCard>`_
 
@@ -213,25 +242,61 @@ def make_mecard(name, reading=None, email=None, phone=None, videophone=None,
     :type country: str or None
     :rtype: segno.QRCode
     """
-    return segno.make_qr(make_mecard_data(name=name, reading=reading,
-                                          email=email, phone=phone,
-                                          videophone=videophone, memo=memo,
-                                          nickname=nickname, birthday=birthday,
-                                          url=url, pobox=pobox, roomno=roomno,
-                                          houseno=houseno, city=city,
-                                          prefecture=prefecture, zipcode=zipcode,
-                                          country=country))
+    return segno.make_qr(
+        make_mecard_data(
+            name=name,
+            reading=reading,
+            email=email,
+            phone=phone,
+            videophone=videophone,
+            memo=memo,
+            nickname=nickname,
+            birthday=birthday,
+            url=url,
+            pobox=pobox,
+            roomno=roomno,
+            houseno=houseno,
+            city=city,
+            prefecture=prefecture,
+            zipcode=zipcode,
+            country=country,
+        )
+    )
 
 
-_looks_like_datetime = re.compile(r'^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:(?:-?\d{2}:\d{2})|Z)?)?$').match
+_looks_like_datetime = re.compile(
+    r"^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:(?:-?\d{2}:\d{2})|Z)?)?$"
+).match
 
 
-def make_vcard_data(name, displayname, email=None, phone=None, fax=None,
-                    videophone=None, memo=None, nickname=None, birthday=None,
-                    url=None, pobox=None, street=None, city=None, region=None,
-                    zipcode=None, country=None, org=None, lat=None, lng=None,
-                    source=None, rev=None, title=None, photo_uri=None,
-                    cellphone=None, homephone=None, workphone=None):
+def make_vcard_data(
+    name,
+    displayname,
+    email=None,
+    phone=None,
+    fax=None,
+    videophone=None,
+    memo=None,
+    nickname=None,
+    birthday=None,
+    url=None,
+    pobox=None,
+    street=None,
+    city=None,
+    region=None,
+    zipcode=None,
+    country=None,
+    org=None,
+    lat=None,
+    lng=None,
+    source=None,
+    rev=None,
+    title=None,
+    photo_uri=None,
+    cellphone=None,
+    homephone=None,
+    workphone=None,
+):
     """\
     Creates a string encoding the contact information as vCard 3.0.
 
@@ -292,70 +357,97 @@ def make_vcard_data(name, displayname, email=None, phone=None, fax=None,
     :type workphone: str, iterable of strings, or None
     :rtype: str
     """
+
     def make_multifield(name, val):
         if not val:
             return ()
         if isinstance(val, str):
             val = (val,)
-        return [f'{name}:{escape(i)}' for i in val]
+        return [f"{name}:{escape(i)}" for i in val]
 
     escape = _escape_vcard
-    data = ['BEGIN:VCARD', 'VERSION:3.0',
-            f'N:{name}',
-            f'FN:{escape(displayname)}']
+    data = ["BEGIN:VCARD", "VERSION:3.0", f"N:{name}", f"FN:{escape(displayname)}"]
     if org:
-        data.append(f'ORG:{escape(org)}')
-    data.extend(make_multifield('EMAIL', email))
-    data.extend(make_multifield('TEL', phone))
-    data.extend(make_multifield('TEL;TYPE=FAX', fax))
-    data.extend(make_multifield('TEL;TYPE=VIDEO', videophone))
-    data.extend(make_multifield('TEL;TYPE=CELL', cellphone))
-    data.extend(make_multifield('TEL;TYPE=HOME', homephone))
-    data.extend(make_multifield('TEL;TYPE=WORK', workphone))
-    data.extend(make_multifield('URL', url))
-    data.extend(make_multifield('TITLE', title))
-    data.extend(make_multifield('PHOTO;VALUE=uri', photo_uri))
+        data.append(f"ORG:{escape(org)}")
+    data.extend(make_multifield("EMAIL", email))
+    data.extend(make_multifield("TEL", phone))
+    data.extend(make_multifield("TEL;TYPE=FAX", fax))
+    data.extend(make_multifield("TEL;TYPE=VIDEO", videophone))
+    data.extend(make_multifield("TEL;TYPE=CELL", cellphone))
+    data.extend(make_multifield("TEL;TYPE=HOME", homephone))
+    data.extend(make_multifield("TEL;TYPE=WORK", workphone))
+    data.extend(make_multifield("URL", url))
+    data.extend(make_multifield("TITLE", title))
+    data.extend(make_multifield("PHOTO;VALUE=uri", photo_uri))
     if nickname:
-        data.append(f'NICKNAME:{escape(nickname)}')
+        data.append(f"NICKNAME:{escape(nickname)}")
     adr_properties = (pobox, street, city, region, zipcode, country)
     if any(adr_properties):
-        adr_data = [escape(i or '') for i in adr_properties]
-        data.append('ADR:{0};;{1};{2};{3};{4};{5}'.format(*adr_data))  # noqa UP030
+        adr_data = [escape(i or "") for i in adr_properties]
+        data.append("ADR:{0};;{1};{2};{3};{4};{5}".format(*adr_data))  # noqa UP030
     if birthday:
         try:
-            birthday = birthday.strftime('%Y-%m-%d')
+            birthday = birthday.strftime("%Y-%m-%d")
         except AttributeError:
             pass
         if not isinstance(birthday, str) or not _looks_like_datetime(birthday):
-            raise ValueError('"birthday" does not seem to be a valid date or date/time representation')
-        data.append(f'BDAY:{birthday}')
+            raise ValueError(
+                '"birthday" does not seem to be a valid date or date/time representation'
+            )
+        data.append(f"BDAY:{birthday}")
     if (lat and not lng) or (lng and not lat):
-        raise ValueError('Incomplete geo information, please specify latitude and longitude.')
+        raise ValueError(
+            "Incomplete geo information, please specify latitude and longitude."
+        )
     if lat and lng:
-        data.append(f'GEO:{lat};{lng}')
+        data.append(f"GEO:{lat};{lng}")
     if source:
-        data.append(f'SOURCE:{escape(source)}')
+        data.append(f"SOURCE:{escape(source)}")
     if memo:
-        data.append(f'NOTE:{escape(memo)}')
+        data.append(f"NOTE:{escape(memo)}")
     if rev:
         try:
-            rev = rev.strftime('%Y-%m-%d')
+            rev = rev.strftime("%Y-%m-%d")
         except AttributeError:
             pass
         if not isinstance(rev, str) or not _looks_like_datetime(rev):
-            raise ValueError('"rev" does not seem to be a valid date or date/time representation')
-        data.append(f'REV:{rev}')
-    data.append('END:VCARD')
-    data.append('')
-    return '\r\n'.join(data)
+            raise ValueError(
+                '"rev" does not seem to be a valid date or date/time representation'
+            )
+        data.append(f"REV:{rev}")
+    data.append("END:VCARD")
+    data.append("")
+    return "\r\n".join(data)
 
 
-def make_vcard(name, displayname, email=None, phone=None, fax=None,
-               videophone=None, memo=None, nickname=None, birthday=None,
-               url=None, pobox=None, street=None, city=None, region=None,
-               zipcode=None, country=None, org=None, lat=None, lng=None,
-               source=None, rev=None, title=None, photo_uri=None,
-               cellphone=None, homephone=None, workphone=None):
+def make_vcard(
+    name,
+    displayname,
+    email=None,
+    phone=None,
+    fax=None,
+    videophone=None,
+    memo=None,
+    nickname=None,
+    birthday=None,
+    url=None,
+    pobox=None,
+    street=None,
+    city=None,
+    region=None,
+    zipcode=None,
+    country=None,
+    org=None,
+    lat=None,
+    lng=None,
+    source=None,
+    rev=None,
+    title=None,
+    photo_uri=None,
+    cellphone=None,
+    homephone=None,
+    workphone=None,
+):
     """\
     Creates a QR code which encodes a `vCard <https://en.wikipedia.org/wiki/VCard>`_
     version 3.0.
@@ -417,19 +509,36 @@ def make_vcard(name, displayname, email=None, phone=None, fax=None,
     :type workphone: str, iterable of strings, or None
     :rtype: segno.QRCode
     """
-    return segno.make_qr(make_vcard_data(name, displayname, email=email,
-                                         phone=phone, fax=fax,
-                                         videophone=videophone, memo=memo,
-                                         nickname=nickname, birthday=birthday,
-                                         url=url, pobox=pobox, street=street,
-                                         city=city, region=region,
-                                         zipcode=zipcode, country=country,
-                                         org=org, lat=lat, lng=lng,
-                                         source=source, rev=rev, title=title,
-                                         photo_uri=photo_uri,
-                                         cellphone=cellphone,
-                                         homephone=homephone,
-                                         workphone=workphone))
+    return segno.make_qr(
+        make_vcard_data(
+            name,
+            displayname,
+            email=email,
+            phone=phone,
+            fax=fax,
+            videophone=videophone,
+            memo=memo,
+            nickname=nickname,
+            birthday=birthday,
+            url=url,
+            pobox=pobox,
+            street=street,
+            city=city,
+            region=region,
+            zipcode=zipcode,
+            country=country,
+            org=org,
+            lat=lat,
+            lng=lng,
+            source=source,
+            rev=rev,
+            title=title,
+            photo_uri=photo_uri,
+            cellphone=cellphone,
+            homephone=homephone,
+            workphone=workphone,
+        )
+    )
 
 
 def make_geo_data(lat, lng):
@@ -440,10 +549,11 @@ def make_geo_data(lat, lng):
     :param float lng: Longitude
     :rtype: str
     """
-    def float_to_str(f):
-        return f'{f:.8f}'.rstrip('0').rstrip('.')
 
-    return f'geo:{float_to_str(lat)},{float_to_str(lng)}'
+    def float_to_str(f):
+        return f"{f:.8f}".rstrip("0").rstrip(".")
+
+    return f"geo:{float_to_str(lat)},{float_to_str(lng)}"
 
 
 def make_geo(lat, lng):
@@ -475,6 +585,7 @@ def make_make_email_data(to, cc=None, bcc=None, subject=None, body=None):
     :type body: str or None
     :rtype: str
     """
+
     def multi(val):
         if not val:
             return ()
@@ -482,21 +593,21 @@ def make_make_email_data(to, cc=None, bcc=None, subject=None, body=None):
             return (val,)
         return tuple(val)
 
-    delim = '?'
-    data = ['mailto:']
+    delim = "?"
+    data = ["mailto:"]
     if not to:
         raise ValueError('"to" must not be empty or None')
-    data.append(','.join(multi(to)))
-    for key, val in (('cc', cc), ('bcc', bcc)):
+    data.append(",".join(multi(to)))
+    for key, val in (("cc", cc), ("bcc", bcc)):
         vals = multi(val)
         if vals:
             data.append(f'{delim}{key}={",".join(vals)}')
-            delim = '&'
-    for key, val in (('subject', subject), ('body', body)):
+            delim = "&"
+    for key, val in (("subject", subject), ("body", body)):
         if val is not None:
             data.append(f'{delim}{key}={quote(val.encode("utf-8"))}')
-        delim = '&'
-    return ''.join(data)
+        delim = "&"
+    return "".join(data)
 
 
 def make_email(to, cc=None, bcc=None, subject=None, body=None):
@@ -516,12 +627,14 @@ def make_email(to, cc=None, bcc=None, subject=None, body=None):
     :type body: str or None
     :rtype: segno.QRCode
     """
-    return segno.make_qr(make_make_email_data(to=to, cc=cc, bcc=bcc,
-                                              subject=subject, body=body))
+    return segno.make_qr(
+        make_make_email_data(to=to, cc=cc, bcc=bcc, subject=subject, body=body)
+    )
 
 
-def _make_epc_qr_data(name, iban, amount, text=None, reference=None, bic=None,
-                      purpose=None, encoding=None):
+def _make_epc_qr_data(
+    name, iban, amount, text=None, reference=None, bic=None, purpose=None, encoding=None
+):
     """\
     Validates the input and creates the data for an EPC QR Code.
 
@@ -531,10 +644,18 @@ def _make_epc_qr_data(name, iban, amount, text=None, reference=None, bic=None,
     See :py:func:`make_epc_qr` for a description of the parameters.
     """
     # Ordering is important!
-    encodings = ('utf-8', 'iso-8859-1', 'iso-8859-2', 'iso-8859-4',
-                 'iso-8859-5', 'iso-8859-7', 'iso-8859-10', 'iso-8859-15')
-    min_amount = decimal.Decimal('0.01')
-    max_amount = decimal.Decimal('999999999.99')
+    encodings = (
+        "utf-8",
+        "iso-8859-1",
+        "iso-8859-2",
+        "iso-8859-4",
+        "iso-8859-5",
+        "iso-8859-7",
+        "iso-8859-10",
+        "iso-8859-15",
+    )
+    min_amount = decimal.Decimal("0.01")
+    max_amount = decimal.Decimal("999999999.99")
     text = text.rstrip() if text else text
     reference = reference.rstrip() if reference else reference
     bic = bic.strip() if bic else bic
@@ -544,41 +665,56 @@ def _make_epc_qr_data(name, iban, amount, text=None, reference=None, bic=None,
             try:
                 encoding = encodings.index(encoding.lower()) + 1
             except ValueError:
-                raise ValueError(f'Invalid encoding "{encoding}", use one of {encodings}')
+                raise ValueError(
+                    f'Invalid encoding "{encoding}", use one of {encodings}'
+                )
         elif not isinstance(encoding, int) or not 1 <= encoding <= len(encodings):
-            raise ValueError(f'Invalid encoding number only 1 .. 8 are allowed, got "{encoding}"')
+            raise ValueError(
+                f'Invalid encoding number only 1 .. 8 are allowed, got "{encoding}"'
+            )
     if (not text and not reference) or (text and reference):
-        raise ValueError('Either a text or a creditor reference (ISO 11649) must be provided')
+        raise ValueError(
+            "Either a text or a creditor reference (ISO 11649) must be provided"
+        )
     if text and not 0 < len(text) <= 140:
-        raise ValueError(f'Invalid text, max. 140 characters are allowed, got "{len(text)}"')
+        raise ValueError(
+            f'Invalid text, max. 140 characters are allowed, got "{len(text)}"'
+        )
     elif reference and not 0 < len(reference) <= 35:
-        raise ValueError('Invalid creditor reference (ISO 11649), max. 35 characters are allowed, '
-                         f'got "{len(reference)}"')
+        raise ValueError(
+            "Invalid creditor reference (ISO 11649), max. 35 characters are allowed, "
+            f'got "{len(reference)}"'
+        )
     if name is None or not 0 < len(name) <= 70:
         raise ValueError(f'Invalid name, max. 70 characters are allowed, got "{name}"')
     if iban is None or not 4 < len(iban) <= 34:
-        raise ValueError(f'Invalid IBAN, min. 5 and max. 34 characters are allowed, got "{iban}"')
+        raise ValueError(
+            f'Invalid IBAN, min. 5 and max. 34 characters are allowed, got "{iban}"'
+        )
     if bic and len(bic) not in (8, 11):
         raise ValueError(f'Invalid BIC, should be 8 or 11 characters long, got "{bic}"')
     if purpose and len(purpose) != 4:
         raise ValueError(f'Invalid purpose, 4 characters are allowed, got "{purpose}"')
     amount = decimal.Decimal(amount)
     if not min_amount <= amount <= max_amount:
-        raise ValueError(f'Invalid amount, must be in bigger or equal {min_amount} and less or equal {max_amount}')
-    tmp_data = ['BCD',  # Service tag
-                '002',  # Version
-                '',  # character set (will be set later)
-                'SCT',  # Identification
-                bic or '',  # BIC
-                name,  # Name of the recipient
-                iban,  # IBAN
-                f'EUR{amount:.2f}'.rstrip('0').rstrip('.'),  # Amount
-                purpose or '',  # Purpose
-                reference or '',  # Remittance
-                ]
+        raise ValueError(
+            f"Invalid amount, must be in bigger or equal {min_amount} and less or equal {max_amount}"
+        )
+    tmp_data = [
+        "BCD",  # Service tag
+        "002",  # Version
+        "",  # character set (will be set later)
+        "SCT",  # Identification
+        bic or "",  # BIC
+        name,  # Name of the recipient
+        iban,  # IBAN
+        f"EUR{amount:.2f}".rstrip("0").rstrip("."),  # Amount
+        purpose or "",  # Purpose
+        reference or "",  # Remittance
+    ]
     if text:
         tmp_data.append(text)
-    data = '\n'.join(tmp_data)
+    data = "\n".join(tmp_data)
     charset = -1 if encoding is None else encoding
     if charset < 0:
         for idx, enc in enumerate(encodings[1:], start=2):
@@ -591,15 +727,18 @@ def _make_epc_qr_data(name, iban, amount, text=None, reference=None, bic=None,
     if charset < 0:
         charset = 1  # Use UTF-8
     tmp_data[2] = str(charset)  # Set character set
-    data = '\n'.join(tmp_data).encode(encodings[charset - 1])
+    data = "\n".join(tmp_data).encode(encodings[charset - 1])
     # Max. payload: 331 bytes
     if len(data) > 331:  # pragma: no cover
-        raise ValueError(f'Payload is too big: Max. 331 bytes allowed, got {len(data)} bytes')
+        raise ValueError(
+            f"Payload is too big: Max. 331 bytes allowed, got {len(data)} bytes"
+        )
     return data
 
 
-def make_epc_qr(name, iban, amount, text=None, reference=None, bic=None,
-                purpose=None, encoding=None):
+def make_epc_qr(
+    name, iban, amount, text=None, reference=None, bic=None, purpose=None, encoding=None
+):
     """\
     Creates and returns an European Payments Council Quick Response Code
     (EPC QR Code) version 002.
@@ -641,10 +780,14 @@ def make_epc_qr(name, iban, amount, text=None, reference=None, bic=None,
     """
     # Create a QR Code, error correction level "M".
     # It's not allowed to use another level therefore boost_error must be disabled
-    qr = segno.make_qr(_make_epc_qr_data(name, iban, amount, text, reference,
-                                         bic, purpose, encoding),
-                       error='m', boost_error=False)
+    qr = segno.make_qr(
+        _make_epc_qr_data(name, iban, amount, text, reference, bic, purpose, encoding),
+        error="m",
+        boost_error=False,
+    )
     # This shouldn't happen
     if qr.version > 13:  # pragma: no cover
-        raise ValueError(f'Invalid EPC QR Code, max. QR Code version 13 is allowed, got "{qr.designator}"')
+        raise ValueError(
+            f'Invalid EPC QR Code, max. QR Code version 13 is allowed, got "{qr.designator}"'
+        )
     return qr

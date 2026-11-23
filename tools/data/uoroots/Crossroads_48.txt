@@ -1,8 +1,0 @@
-Zombie Guard
-_Props/Grub Bottle
-Crossroads Pole Scarab
-brk_barrel_04
-brk_barrel_02
-brk_barrel_05
-brk_barrel_03
-_SceneManager

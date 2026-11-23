@@ -1,6 +1,0 @@
-Soul Totem white_Infinte (2)
-End Scene
-bot1
-Battle Scene
-Audio Field
-_SceneManager

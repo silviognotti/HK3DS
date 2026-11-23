@@ -12,5 +12,7 @@ void lang_set(int lang);                   // switch language: the old text is f
 void lang_gc(void);                        // free the switched-away language (call where no old text is on show)
 const char *lang_name(int lang);           // "English" / "Español"
 extern bool g_hints;                       // the button hints at the bottom of the screens (Options: Button Hints)
+extern bool g_lowEffects;                  // reduce vignette/darkness/overdraw effects
+extern bool g_lowParticles;                // reduce particle emitter and alive budgets
 void settings_load(void);                  // sdmc:/3ds/hk3ds/settings.txt: language, volumes, button hints
 void settings_save(void);

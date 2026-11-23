@@ -1,7 +1,0 @@
-Entry Object
-GG_Arena_Prefab
-Boss Scene Controller
-Colosseum Gate R
-Colosseum Music
-Unlock Boss Scene (1)
-_SceneManager

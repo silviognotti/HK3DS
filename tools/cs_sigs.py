@@ -1,36 +1,81 @@
-# Build a map of C# class -> serialized field names from the decompiled Assembly-CSharp, used to identify
-# MonoBehaviours in the scene files (AssetRipper keeps only the script guid, and the scripts have no .meta files).
-import re, glob, os, json, sys
-SRC = os.environ.get('HKDATA', 'hkdata') + '/Assembly-CSharp'
-def classes():
+# Build a map of C# class -> serialized field names from the decompiled Assembly-CSharp.
+import argparse
+import glob
+import json
+import os
+import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from parallel_helpers import interruptible_main, parallel_executor
+
+SRC = os.environ.get("HKDATA", "hkdata") + "/Assembly-CSharp"
+
+
+def parse_file(path):
+    found = {}
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        text = handle.read()
+    pattern = re.compile(
+        r"^(?:public |internal )?(?:sealed |abstract )?(?:partial )?"
+        r"class (\w+)(?:\s*:\s*([\w\.<>, ]+))?",
+        re.M,
+    )
+    field_pattern = re.compile(
+        r"^\t(?:\[[^\]]*\]\s*)*(?:(?:public|private|protected|internal)\s+)?"
+        r"((?:static|const|readonly)\s+)?([\w\.\[\]<>,]+)\s+(\w+)\s*(?:=[^;]*)?;",
+        re.M,
+    )
+    for match in pattern.finditer(text):
+        name = match.group(1)
+        base = (match.group(2) or "").split(",")[0].strip()
+        fields = []
+        for field in field_pattern.finditer(text, match.end()):
+            if field.group(1) and field.group(1).strip() in ("static", "const"):
+                continue
+            fields.append(field.group(3))
+        found[name] = {"base": base, "fields": fields}
+    return found
+
+
+def classes(workers=None):
+    if workers is None:
+        workers = min(16, (os.cpu_count() or 1) * 2)
     out = {}
-    for f in glob.glob(f'{SRC}/**/*.cs', recursive=True):
-        txt = open(f, encoding='utf-8', errors='replace').read()
-        for m in re.finditer(r'^(?:public |internal )?(?:sealed |abstract )?(?:partial )?class (\w+)(?:\s*:\s*([\w\.<>, ]+))?', txt, re.M):
-            name, base = m.group(1), (m.group(2) or '').split(',')[0].strip()
-            # fields at one indent level below the class
-            body_start = m.end()
-            fields = []
-            for fm in re.finditer(r'^\t(?:\[[^\]]*\]\s*)*(?:(?:public|private|protected|internal)\s+)?((?:static|const|readonly)\s+)?([\w\.\[\]<>,]+)\s+(\w+)\s*(?:=[^;]*)?;', txt[body_start:], re.M):
-                if fm.group(1) and fm.group(1).strip() in ('static', 'const'): continue
-                fields.append(fm.group(3))
-            out[name] = {'base': base, 'fields': fields}
+    files = glob.glob(f"{SRC}/**/*.cs", recursive=True)
+    with parallel_executor(ThreadPoolExecutor, max_workers=workers) as pool:
+        for found in pool.map(parse_file, files):
+            out.update(found)
     return out
-if __name__ == '__main__':
-    c = classes()
-    json.dump(c, open(os.path.join(os.path.dirname(__file__), 'data', 'cs_sigs.json'), 'w'))
-    print(len(c), 'classes'); print(c.get('HealthManager', {}).get('fields', [])[:20]); print(c.get('Walker'))
+
 
 def identify(keys, sigs, cache={}):
     """Best class for a MonoBehaviour's serialized keys (all keys must be fields of the class)."""
-    ks = frozenset(k for k in keys if not k.startswith('m_'))
-    if ks in cache: return cache[ks]
-    best, bs = None, -1
+    ks = frozenset(key for key in keys if not key.startswith("m_"))
+    if ks in cache:
+        return cache[ks]
+    best, score = None, -1
     if ks:
-        for name, d in sigs.items():
-            fs = set(d['fields'])
-            if ks <= fs:
-                sc = len(ks) / (len(fs) + 1)
-                if sc > bs: best, bs = name, sc
+        for name, data in sigs.items():
+            fields = set(data["fields"])
+            if ks <= fields:
+                candidate = len(ks) / (len(fields) + 1)
+                if candidate > score:
+                    best, score = name, candidate
     cache[ks] = best
     return best
+
+
+if __name__ == "__main__":
+    def run():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--workers", type=int, default=min(16, (os.cpu_count() or 1) * 2))
+        args = parser.parse_args()
+        result = classes(max(1, args.workers))
+        output = os.path.join(os.path.dirname(__file__), "data", "cs_sigs.json")
+        os.makedirs(os.path.dirname(output), exist_ok=True)
+        with open(output, "w", encoding="utf-8") as handle:
+            json.dump(result, handle)
+        print(len(result), "classes")
+        print(result.get("HealthManager", {}).get("fields", [])[:20])
+        print(result.get("Walker"))
+    raise SystemExit(interruptible_main(run))

@@ -115,6 +115,8 @@ const char *lang_name(int lang) { return lang == LANG_ES ? "Espa\xf1ol" : "Engli
 // settings.txt on the SD card: the language, the volumes and the button hints
 #include "audio.h"
 bool g_hints = true;
+bool g_lowEffects = false;
+bool g_lowParticles = false;
 void settings_load(void) {
     FILE *f = fopen("sdmc:/3ds/hk3ds/settings.txt", "rb"); if (!f) return;
     char ln[64];
@@ -124,12 +126,20 @@ void settings_load(void) {
         else if (sscanf(ln, "music %d", &v) == 1 && v >= 0 && v <= 10) g_musicVolume = v / 10.0f;
         else if (sscanf(ln, "sound %d", &v) == 1 && v >= 0 && v <= 10) g_sfxVolume = v / 10.0f;
         else if (sscanf(ln, "hints %d", &v) == 1) g_hints = v != 0;
+        else if (sscanf(ln, "effects %d", &v) == 1) g_lowEffects = v != 0;
+        else if (sscanf(ln, "particles %d", &v) == 1) g_lowParticles = v != 0;
     }
     fclose(f);
 }
 void settings_save(void) {
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/hk3ds", 0777);
     FILE *f = fopen("sdmc:/3ds/hk3ds/settings.txt", "wb"); if (!f) return;
-    fprintf(f, "lang %d\nmusic %d\nsound %d\nhints %d\n", g_lang, (int)(g_musicVolume * 10 + 0.5f), (int)(g_sfxVolume * 10 + 0.5f), g_hints ? 1 : 0);
+    fprintf(f, "lang %d\nmusic %d\nsound %d\nhints %d\neffects %d\nparticles %d\n",
+            g_lang,
+            (int)(g_musicVolume * 10 + 0.5f),
+            (int)(g_sfxVolume * 10 + 0.5f),
+            g_hints ? 1 : 0,
+            g_lowEffects ? 1 : 0,
+            g_lowParticles ? 1 : 0);
     fclose(f);
 }

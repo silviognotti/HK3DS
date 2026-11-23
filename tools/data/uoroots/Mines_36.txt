@@ -1,7 +1,0 @@
-Shiny Item Stand
-Steep Slope (1)
-brk_Crystal3
-right1
-brk_Crystal4
-brk_Crystal3 (1)
-_SceneManager

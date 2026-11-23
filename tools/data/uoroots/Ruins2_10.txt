@@ -1,8 +1,0 @@
-elev_main
-Floor Tink Colliders (2)
-Floor Tink Colliders
-Enviro Region
-_Scenery/station_pole/Stag_Pole_Tall_Break (2)
-Stag Blanker
-_SceneManager
-wall_unbroken

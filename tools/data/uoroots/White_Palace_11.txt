@@ -1,9 +1,0 @@
-Royal Gaurd
-Dream Entry
-Steep Slope
-Palace Gate
-door1
-doorWarp
-Darkness Region
-Superdash Cancel
-_SceneManager

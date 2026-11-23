@@ -1,4 +1,0 @@
-Dream Moth
-door_dreamReturn
-right1
-_SceneManager

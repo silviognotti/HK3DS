@@ -1,7 +1,0 @@
-Heart Piece
-Diary
-Bretta Sleeping
-right1
-Basement Open
-Bedroom Items
-_SceneManager

@@ -1,8 +1,0 @@
-Alive_Tuk
-Dead_Tuk
-waterways_break_pipe_angle
-Steep Slope
-waterways_break_pipe_bulge (1)
-left1
-Audio Interior Rain
-_SceneManager

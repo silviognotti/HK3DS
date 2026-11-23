@@ -1,7 +1,0 @@
-Brumm Torch NPC
-cut_web fat
-cut_web triangle
-Dream Dialogue (1)
-cut_web
-Dream Dialogue
-_SceneManager

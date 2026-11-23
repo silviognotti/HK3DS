@@ -1,8 +1,0 @@
-Grub Bottle
-Battle Gate
-Ruins Trophy Medium
-Battle Scene
-left1
-Ruins Trophy Large
-ruind_dressing_light_03
-_SceneManager

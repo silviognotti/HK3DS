@@ -80,10 +80,12 @@ int menu_update(float dt, u32 down) {
             if ((down & KEY_A) || (down & KEY_B)) { page = M_SLOTS; sel = clearSlot; if (!(down & KEY_A)) sfx_play("button", 0.5f); }
             break;
         case M_OPTIONS:
-            if (down & (KEY_DUP | KEY_DDOWN)) move_sel(down & KEY_DUP ? -1 : 1, 4);
+            if (down & (KEY_DUP | KEY_DDOWN)) move_sel(down & KEY_DUP ? -1 : 1, 6);
             if (down & (KEY_DLEFT | KEY_DRIGHT | ((sel >= 2) ? KEY_A : 0))) {
                 if (sel == 2) { lang_set((g_lang + 1) % LANG_COUNT); ach_reload(); }     // Language
                 else if (sel == 3) g_hints = !g_hints;                                    // Button Hints
+                else if (sel == 4) g_lowEffects = !g_lowEffects;
+                else if (sel == 5) g_lowParticles = !g_lowParticles;
                 else {
                     float d = (down & KEY_DLEFT) ? -0.1f : 0.1f;
                     float *v = sel == 0 ? &g_musicVolume : &g_sfxVolume;
@@ -195,13 +197,15 @@ void menu_draw_top(void) {
             break;
         }
         case M_OPTIONS: {
-            char a[64], b[64], c[64], d[64];
+            char a[64], b[64], c[64], d[64], e[64], f[64];
             snprintf(a, sizeof a, "%s  %d", lang_get_or_key("AUDIO_MUSIC_VOL", "MainMenu"), (int)roundf(g_musicVolume * 10));
             snprintf(b, sizeof b, "%s  %d", lang_get_or_key("AUDIO_SOUND_VOL", "MainMenu"), (int)roundf(g_sfxVolume * 10));
             snprintf(c, sizeof c, "%s  %s", lang_get_or_key("GAME_LANGUAGE", "MainMenu"), lang_name(g_lang));
             snprintf(d, sizeof d, "%s  %s", TR("Button Hints"), lang_get_or_key(g_hints ? "MOH_ON" : "MOH_OFF", "MainMenu"));
-            const char *items[4] = { a, b, c, d };
-            draw_items(items, 4, 116, 26);
+            snprintf(e, sizeof e, "Effects  %s", g_lowEffects ? "Low" : "Normal");
+            snprintf(f, sizeof f, "Particles  %s", g_lowParticles ? "Low" : "Normal");
+            const char *items[6] = { a, b, c, d, e, f };
+            draw_items(items, 6, 116, 18);
             break;
         }
         case M_ACH: {      // the game's achievements page: unlocked ones bright, the rest dimmed

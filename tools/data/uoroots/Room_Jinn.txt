@@ -1,7 +1,0 @@
-Jinn NPC
-Glow Bug (4)
-Glow Bug (2)
-Glow Bug
-Glow Bug (1)
-Glow Bug (3)
-_SceneManager

@@ -1,9 +1,0 @@
-Emilitia NPC
-Ruins Lever
-Dream Dialogue
-brk_barrel_01
-Open Door
-left2
-left1
-Ruins Trophy Large
-_SceneManager

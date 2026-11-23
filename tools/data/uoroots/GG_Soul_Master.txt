@@ -1,8 +1,0 @@
-Mage Lord Phase2
-Mage Lord
-GG_Arena_Prefab
-Boss Scene Controller
-ruin_pole_lantern
-Ruins pole_wrought_seal
-mage_particles
-_SceneManager

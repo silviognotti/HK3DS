@@ -149,6 +149,7 @@ static int budget(void) {
     return b;
 }
 static void rebudget(void) {   // the steady count (rate x life, capped by its max) of every emitter in view, against the budget
+    extern bool g_lowParticles;
     float want = 0;
     for (int i = 0; i < nems; i++) {
         Emitter *m = &ems[i]; if (!m->used || !m->playing || !m->near) continue;
@@ -159,6 +160,7 @@ static void rebudget(void) {   // the steady count (rate x life, capped by its m
         want += n;
     }
     budgetScale = want > budget() ? budget() / want : 1;
+    if (g_lowParticles) budgetScale *= 0.45f;
 }
 
 /* ---------------- emitting ---------------- */
@@ -283,6 +285,8 @@ void particles_load(const char *room, const char *zoneName) {
     (void)zoneName;
     particles_unload();
     if (!parts) particles_init();
+    extern bool g_lowParticles;
+    if (g_lowParticles) return;
     if (getenv("HK_NOPARTICLES")) return;
     char path[96]; snprintf(path, sizeof path, "romfs:/rooms/%s.ptc", room);
     size_t sz; char *txt = read_file(path, &sz);
@@ -399,6 +403,7 @@ void particles_obj_rate(UObj *o, float rate) { if (o) each_ps(o, false, ps_rate,
 
 /* ---------------- update ---------------- */
 void particles_update(float dt, float camx, float camy) {
+    extern bool g_lowParticles;
     if (!parts || !nems) { nparts = 0; return; }
     if (dt > 0.1f) dt = 0.1f;
     static float rbT;

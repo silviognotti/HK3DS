@@ -1,7 +1,0 @@
-Giraffe NPC
-Shiny Item
-Giraffe Upper NPC (1)
-Dream Dialogue (1)
-Dream Dialogue
-right1
-_SceneManager

@@ -1,8 +1,0 @@
-NM Mato NPC
-Mr Mushroom NPC
-Sit Region
-Dream Dialogue
-left1
-Scene Blanker
-room_particle_set
-_SceneManager
