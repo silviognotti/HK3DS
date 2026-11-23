@@ -377,6 +377,8 @@ static void build_minimap(Room *r) {
     r->hasMap = true;
 }
 
+static bool file_there(const char *p) { FILE *f = fopen(p, "rb"); if (f) fclose(f); return f != NULL; }
+
 bool room_load(Room *r, const char *id) {
     memset(r, 0, sizeof(*r));
     strncpy(r->id, id, 31);
@@ -415,6 +417,7 @@ bool room_load(Room *r, const char *id) {
 
     snprintf(path, sizeof path, "romfs:/rooms/%s.lyr", id);
     r->blob = read_file(path, &sz);
+    if (!r->blob) hk_log("room %s: no art (%s)", id, file_there(path) ? "not enough memory" : "file missing");
     if (r->blob) {
         r->zipped = !memcmp(r->blob, "HKL2", 4);
         p = r->blob + 4;

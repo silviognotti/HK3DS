@@ -7,38 +7,63 @@ int hk_zlib_uncompress(void *out, unsigned int *outLen, const void *src, unsigne
 
 #include "ext/tinf.h"
 
-static void *read_file_raw(const char *path, size_t *size);
+// A big HKZ1 file is unpacked in one buffer: the packed stream is read into the end of the buffer and unpacked from
+// there towards its start, so the packed and the unpacked data never need memory of their own at once. The rooms' art
+// (.lyr) is HKZ1 around tiles that are packed already, so the two are about the same size: holding both doubled what a
+// room switch needed, and on a console short of memory the art didn't load and the room stayed black.
+// The output can't catch up with the unread input: the gap between them is MARGIN plus however much the rest of the
+// stream will still grow by unpacking. It dips below MARGIN only where the rest of the stream is bigger than what it
+// unpacks to, and zlib picks the smallest form for every block, so that is part of one block at most (level 9 blocks
+// hold 16K codes) plus 5 bytes per stored block; libdeflate writes at most a few hundred bytes ahead of its output.
+#define INPLACE_MARGIN(raw) (65536u + ((raw) >> 12))
 
 // Data files may be zlib-wrapped: 'HKZ1' u32 rawSize, zlib stream.
 void *read_file(const char *path, size_t *size) {
-    size_t n;
-    u8 *buf = read_file_raw(path, &n);
-    if (!buf) return NULL;
-    if (n >= 8 && !memcmp(buf, "HKZ1", 4)) {
-        u32 raw; memcpy(&raw, buf + 4, 4);
-        u8 *out = malloc(raw + 1);              // +1: always NUL-terminated (text files are parsed with strtok)
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;                    // (many callers just look whether a file is there)
+    long n = 0;
+    if (fseek(f, 0, SEEK_END) == 0) n = ftell(f);
+    if (n < 0) n = 0;
+    fseek(f, 0, SEEK_SET);
+    u8 hdr[8]; u32 raw = 0;
+    bool hkz = n >= 8 && fread(hdr, 1, 8, f) == 8 && !memcmp(hdr, "HKZ1", 4);
+    if (hkz) memcpy(&raw, hdr + 4, 4);
+    if (hkz && (size_t)(n - 8) > INPLACE_MARGIN(raw)) {
+        size_t packed = n - 8, total = (size_t)raw + INPLACE_MARGIN(raw);
+        if (total < packed) total = packed;
+        u8 *out = malloc(total + 1);
+        if (!out) { fclose(f); hk_log("read %s: no memory (%luK)", path, (unsigned long)(total / 1024)); return NULL; }
+        u8 *src = out + total - packed;
+        bool ok = fread(src, 1, packed, f) == packed;
+        fclose(f);
         unsigned int outLen = raw;
-        if (!out || hk_zlib_uncompress(out, &outLen, buf + 8, n - 8) != TINF_OK) { free(out); free(buf); return NULL; }
+        if (!ok || hk_zlib_uncompress(out, &outLen, src, packed) != TINF_OK) {
+            hk_log("read %s: %s", path, ok ? "damaged (doesn't unpack)" : "read failed"); free(out); return NULL;
+        }
+        out[outLen] = 0;                    // always NUL-terminated (text files are parsed with strtok)
+        u8 *shrunk = realloc(out, (size_t)outLen + 1);      // the margin and the packed stream's room back
+        if (size) *size = outLen;
+        return shrunk ? shrunk : out;
+    }
+    u8 *buf = malloc(n + 1);
+    if (!buf) { fclose(f); hk_log("read %s: no memory (%ldK)", path, n / 1024); return NULL; }
+    fseek(f, 0, SEEK_SET);
+    bool ok = fread(buf, 1, n, f) == (size_t)n;
+    fclose(f);
+    if (!ok) { free(buf); hk_log("read %s: read failed", path); return NULL; }
+    buf[n] = 0;
+    if (hkz) {
+        u8 *out = malloc(raw + 1);
+        unsigned int outLen = raw;
+        if (!out || hk_zlib_uncompress(out, &outLen, buf + 8, n - 8) != TINF_OK) {
+            hk_log("read %s: %s", path, out ? "damaged (doesn't unpack)" : "no memory to unpack");
+            free(out); free(buf); return NULL;
+        }
         free(buf);
         out[outLen] = 0;
         if (size) *size = outLen;
         return out;
     }
-    if (size) *size = n;
-    return buf;
-}
-
-static void *read_file_raw(const char *path, size_t *size) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
-    fseek(f, 0, SEEK_END);
-    long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char *buf = malloc((n > 0 ? n : 0) + 1);
-    if (!buf) { fclose(f); return NULL; }
-    if (fread(buf, 1, n, f) != (size_t)n) { free(buf); fclose(f); return NULL; }
-    fclose(f);
-    buf[n > 0 ? n : 0] = 0;
     if (size) *size = n;
     return buf;
 }
