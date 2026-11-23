@@ -45,6 +45,8 @@ SKIP_ENEMIES = ('Mender Bug', 'Grub', 'Hatcher Baby', 'Bench')
 def scene_path(name):
     for p in [f'{EX}/Scenes/{name}.unity'] + glob.glob(f'{EX}/*/{name}.unity') + glob.glob(f'{EX}/*/*/{name}.unity'):
         if os.path.exists(p): return p
+    # deeper folders (AssetRipper 2 puts Godhome's boss scenes in Scenes/Gods_Glory/Bosses/), issue #6
+    for p in glob.glob(f'{EX}/Scenes/**/{glob.escape(name)}.unity', recursive=True): return p
     return None
 
 MAPZONES = ['NONE', 'TEST_AREA', 'KINGS_PASS', 'CLIFFS', 'TOWN', 'CROSSROADS', 'GREEN_PATH', 'ROYAL_GARDENS', 'FOG_CANYON', 'WASTES',
