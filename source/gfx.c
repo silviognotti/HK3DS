@@ -104,6 +104,72 @@ void hk_log(const char *fmt, ...) {
     fputc('\n', f); fclose(f);
 }
 
+// 3DS texture memory order: 8x8 tiles row by row, Morton order inside a tile (x in the low bit)
+static inline u32 tex_index(u32 x, u32 y, u32 w) {
+    u32 m = (x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3);
+    return ((y >> 3) * (w >> 3) + (x >> 3)) * 64 + m;
+}
+static void texel_get(const u8 *d, u8 fmt, u32 i, u32 c[4]) {      // -> r g b a, 0..255
+    if (fmt == 0) { const u8 *t = d + i * 4; c[0] = t[3]; c[1] = t[2]; c[2] = t[1]; c[3] = t[0]; return; }   // bytes A B G R
+    u16 v; memcpy(&v, d + i * 2, 2);
+    if (fmt == 1) { c[0] = (v >> 11) * 255 / 31; c[1] = ((v >> 5) & 63) * 255 / 63; c[2] = (v & 31) * 255 / 31; c[3] = 255; }
+    else if (fmt == 3) { c[0] = (v >> 11) * 255 / 31; c[1] = ((v >> 6) & 31) * 255 / 31; c[2] = ((v >> 1) & 31) * 255 / 31; c[3] = (v & 1) * 255; }
+    else { c[0] = (v >> 12) * 17; c[1] = ((v >> 8) & 15) * 17; c[2] = ((v >> 4) & 15) * 17; c[3] = (v & 15) * 17; }
+}
+static u16 texel_put16(u8 fmt, const u32 c[4]) {                    // 16-bit formats (RGBA8 pages come out as RGBA4)
+    if (fmt == 1) return (u16)(((c[0] * 31 + 127) / 255) << 11 | ((c[1] * 63 + 127) / 255) << 5 | ((c[2] * 31 + 127) / 255));
+    if (fmt == 3) return (u16)(((c[0] * 31 + 127) / 255) << 11 | ((c[1] * 31 + 127) / 255) << 6 | ((c[2] * 31 + 127) / 255) << 1 | (c[3] >= 128));
+    return (u16)(((c[0] + 8) / 17) << 12 | ((c[1] + 8) / 17) << 8 | ((c[2] + 8) / 17) << 4 | ((c[3] + 8) / 17));
+}
+// a page's texels as stored in the .spr (run-length packed or not) -> one buffer in texture memory order
+static u8 *page_texels(const u8 *p, u32 size, bool packed, u16 w, u16 h, int unit) {
+    size_t n = (size_t)w * h * unit;
+    u8 *out = malloc(n); if (!out) return NULL;
+    if (!packed) { memcpy(out, p, size < n ? size : n); if (size < n) memset(out + size, 0, n - size); return out; }
+    u8 *dst = out, *end = out + n; const u8 *q = p, *qe = p + size;
+    while (q < qe && dst < end) {
+        u16 hd; memcpy(&hd, q, 2); q += 2; int k = hd & 0x7FFF;
+        if (hd & 0x8000) { for (int j = 0; j < k && dst < end; j++) { memcpy(dst, q, unit); dst += unit; } q += unit; }
+        else { int bytes = k * unit; if (dst + bytes > end) bytes = end - dst; memcpy(dst, q, bytes); dst += bytes; q += k * unit; }
+    }
+    if (dst < end) memset(dst, 0, end - dst);
+    return out;
+}
+// No GPU memory for a page even after giving back sounds and tiles (an Old 3DS in a big boss room: the bosses and the
+// Knight's effects went invisible): keep it at half or a quarter of its size, blurrier but drawn. Frames keep their
+// texture coordinates (they go by the page's full size), so they still find their pixels. 16-bit result.
+static int tex_reduced(C3D_Tex *t, const u8 *p, u32 size, bool packed, u16 w, u16 h, u8 fmt) {
+    extern bool sfx_free_memory(void); extern bool room_tilecache_release(void);
+    GPU_TEXCOLOR out = fmt == 1 ? GPU_RGB565 : fmt == 3 ? GPU_RGBA5551 : GPU_RGBA4;
+    int sc = 0;
+    for (int s = 2; s <= 4 && !sc; s *= 2) {
+        if (w / s < 8 || h / s < 8) break;
+        bool ok = C3D_TexInit(t, w / s, h / s, out);
+        while (!ok && sfx_free_memory()) ok = C3D_TexInit(t, w / s, h / s, out);
+        while (!ok && room_tilecache_release()) ok = C3D_TexInit(t, w / s, h / s, out);
+        if (ok) sc = s;
+    }
+    if (!sc) return 0;
+    u8 *src = page_texels(p, size, packed, w, h, fmt == 0 ? 4 : 2);
+    if (!src) { C3D_TexDelete(t); return 0; }
+    u32 ow = w / sc, oh = h / sc; u16 *o = t->data;
+    for (u32 y = 0; y < oh; y++) for (u32 x = 0; x < ow; x++) {
+        u32 sum[4] = {0, 0, 0, 0}, c[4];       // colour weighted by alpha (no dark fringes from transparent texels)
+        for (int j = 0; j < sc; j++) for (int i = 0; i < sc; i++) {
+            texel_get(src, fmt, tex_index(x * sc + i, y * sc + j, w), c);
+            sum[0] += c[0] * c[3]; sum[1] += c[1] * c[3]; sum[2] += c[2] * c[3]; sum[3] += c[3];
+        }
+        u32 r[4] = {0, 0, 0, sum[3] / (sc * sc)};
+        if (sum[3]) for (int k = 0; k < 3; k++) r[k] = sum[k] / sum[3];
+        o[tex_index(x, y, ow)] = texel_put16(fmt, r);
+    }
+    free(src);
+    GSPGPU_FlushDataCache(t->data, t->size);
+    C3D_TexSetFilter(t, GPU_LINEAR, GPU_LINEAR);
+    C3D_TexSetWrap(t, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+    return sc;
+}
+
 static bool metaOnly;
 bool g_lowmem;      // an Old 3DS: about half the memory (main.c)
 // names, frames and animations without the textures (to see what a set holds before spending GPU memory on it)
@@ -119,10 +185,12 @@ bool spr_load(SpriteSet *s, const char *path) {
     s->npages = RD(u16, p); s->nframes = RD(u16, p); s->nanims = RD(u16, p); s->nnames = RD(u16, p);
     s->pages = calloc(s->npages, sizeof(C3D_Tex));
     u8 *dens = calloc(s->npages ? s->npages : 1, 1);     // HD sheets: texels per screen pixel across (2 on the 800-wide screen)
+    u16 (*psz)[2] = calloc(s->npages ? s->npages : 1, sizeof *psz);     // the pages' sizes in the file (a reduced page is smaller)
     for (int i = 0; i < s->npages; i++) {
         u16 w = RD(u16, p), h = RD(u16, p);
         u8 fmt = RD(u8, p); dens[i] = RD(u8, p); (void)RD(u16, p);
         if (dens[i] < 1) dens[i] = 1;
+        psz[i][0] = w; psz[i][1] = h;
         u32 size = RD(u32, p);
         bool packed = fmt & 0x80; fmt &= 0x7F;
         if (metaOnly) { p += size; continue; }
@@ -160,11 +228,20 @@ bool spr_load(SpriteSet *s, const char *path) {
                     GSPGPU_FlushDataCache(s->pages[i].data, s->pages[i].size);
                     C3D_TexSetFilter(&s->pages[i], GPU_LINEAR, GPU_LINEAR);
                     C3D_TexSetWrap(&s->pages[i], GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
-                } else { hk_log("TEX ALLOC FAIL %s page %d %dx%d (16 bit)", path, i, w, h); memset(&s->pages[i], 0, sizeof s->pages[i]); }
+                } else {
+                    free(tmp); tmp = NULL;
+                    int sc = tex_reduced(&s->pages[i], p, size, packed, w, h, fmt);
+                    if (sc) hk_log("tex %s page %d %dx%d: no room, kept at 1/%d size", path, i, w, h, sc);
+                    else { hk_log("TEX ALLOC FAIL %s page %d %dx%d (16 bit)", path, i, w, h); memset(&s->pages[i], 0, sizeof s->pages[i]); }
+                }
                 free(tmp); p += size; continue;
             }
         }
-        if (!texOk) { hk_log("TEX ALLOC FAIL %s page %d %dx%d fmt %d", path, i, w, h, fmt); memset(&s->pages[i], 0, sizeof s->pages[i]); }
+        if (!texOk) {
+            int sc = tex_reduced(&s->pages[i], p, size, packed, w, h, fmt);
+            if (sc) hk_log("tex %s page %d %dx%d fmt %d: no room, kept at 1/%d size", path, i, w, h, fmt, sc);
+            else { hk_log("TEX ALLOC FAIL %s page %d %dx%d fmt %d", path, i, w, h, fmt); memset(&s->pages[i], 0, sizeof s->pages[i]); }
+        }
         else {
             if (packed) {
                 int unit = fmt == 0 ? 4 : 2;
@@ -189,15 +266,16 @@ bool spr_load(SpriteSet *s, const char *path) {
         f->page = RD(u16, p); f->x = RD(u16, p); f->y = RD(u16, p); f->w = RD(u16, p); f->h = RD(u16, p);
         f->ox = RD(s16, p); f->oy = RD(s16, p); u16 fd = RD(u16, p);
         C3D_Tex *t = &s->pages[f->page];
+        float pw = f->page < s->npages && psz[f->page][0] ? psz[f->page][0] : t->width, ph = f->page < s->npages && psz[f->page][1] ? psz[f->page][1] : t->height;
         u16 texw = f->w; int d = fd ? fd : f->page < s->npages ? dens[f->page] : 1;     // a frame's own density, or its page's
         // an HD frame: twice the texels across, sized and placed in screen pixels like any other (the packer keeps its
         // width and offset even), so the drawing and layout code never knows
         if (d > 1) { f->w = texw / d; f->ox = f->ox / d; }
         f->sub.width = f->w; f->sub.height = f->h;
-        f->sub.left = f->x / (float)t->width;
-        f->sub.right = (f->x + texw) / (float)t->width;
-        f->sub.top = 1.0f - f->y / (float)t->height;   // tex3ds convention: row 0 of memory = top of image = v 1.0
-        f->sub.bottom = 1.0f - (f->y + f->h) / (float)t->height;   // top > bottom (top < bottom means 'rotated' to citro2d)
+        f->sub.left = f->x / pw;
+        f->sub.right = (f->x + texw) / pw;
+        f->sub.top = 1.0f - f->y / ph;   // tex3ds convention: row 0 of memory = top of image = v 1.0
+        f->sub.bottom = 1.0f - (f->y + f->h) / ph;   // top > bottom (top < bottom means 'rotated' to citro2d)
         f->img.tex = t; f->img.subtex = &f->sub;
     }
     s->anims = calloc(s->nanims ? s->nanims : 1, sizeof(Anim));
@@ -218,7 +296,7 @@ bool spr_load(SpriteSet *s, const char *path) {
         memcpy(s->names[i], p, 32); s->names[i][31] = 0; p += 32;
         s->nameFrame[i] = RD(u16, p); (void)RD(u16, p);
     }
-    free(buf); free(dens);
+    free(buf); free(dens); free(psz);
     s->loaded = true;
     return true;
 }
