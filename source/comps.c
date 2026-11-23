@@ -145,6 +145,11 @@ static int cardinal(float deg) {   // DirectionUtils.GetCardinalDirection
     if (a < 225) return 2;
     return 3;
 }
+// HealthManager.IsBlockingByDirection. Spells (and Sharp Shadow) go through the shell of a "Spell Vulnerable" enemy
+// however invincible it is: that's how the Elder Baldurs, curled up against the nail, die to Vengeful Spirit (#8)
+static bool spell_through(UObj *o, AttackType type) {
+    return (type == ATK_SPELL || type == ATK_SHARPSHADOW) && !strcmp(o->tag, "Spell Vulnerable");
+}
 static bool blocking(HM *h, int dir) {
     if (!h->invincible) return false;
     if (h->invDir == 0) return true;
@@ -208,7 +213,7 @@ bool hm_hit(UObj *o, int damage, float direction, AttackType type, float magnitu
     if (!h || h->isDead || h->evasion > 0 || damage <= 0) return false;
     int dir = cardinal(direction);
     UComp *hc = uo_comp(o, C_HEALTH);
-    if (blocking(h, dir)) {
+    if (!spell_through(o, type) && blocking(h, dir)) {
         uo_send_event(o, "BLOCKED HIT"); uo_send_event(o, "HIT");
         if (!h->preventInvEffect) {
             if (type == ATK_NAIL) { extern void hero_recoil_left(void); extern void hero_recoil_right(void); if (dir == 0) hero_recoil_left(); else if (dir == 2) hero_recoil_right(); }
