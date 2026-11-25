@@ -112,7 +112,7 @@ step_check() {
   if [ $COMPILE = 1 ]; then
     say "Checking devkitPro (to build the .3dsx / .cia; --no-compile skips this)"
     [ -n "$DEVKITPRO" ] && [ -n "$DEVKITARM" ] && ok "DEVKITPRO / DEVKITARM set" \
-      || no "DEVKITPRO / DEVKITARM" "install devkitPro and open a new terminal (or: export DEVKITPRO=/opt/devkitpro DEVKITARM=/opt/devkitpro/devkitARM)"
+      || no "DEVKITPRO / DEVKITARM" "install devkitPro in this terminal (README, 'Install the tools'), then open a new one"
     [ -x "$DEVKITARM/bin/arm-none-eabi-gcc" ] && ok "devkitARM compiler" || no "devkitARM compiler" "dkp-pacman -S 3ds-dev"
     command -v mkromfs3ds >/dev/null && ok "mkromfs3ds (the data file)" || no "mkromfs3ds (the data file)" "dkp-pacman -S 3ds-dev"
     for l in libctru citro2d citro3d; do

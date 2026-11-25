@@ -53,12 +53,17 @@ sudo apt install git python3 python3-numpy python3-pil python3-yaml python3-cryp
 ```
 (On a new WSL install, `apt install` says *Unable to locate package* until `sudo apt update` has run. Use the apt
 ffmpeg, not the snap one: the snap version isn't found by the build in WSL and can't read the Windows drives.)
-Then **devkitPro**, which compiles 3DS programs: follow [devkitPro's Getting Started](https://devkitpro.org/wiki/Getting_Started)
-to install its package manager, then run
+Then **devkitPro**, which compiles 3DS programs. Install it in the same Linux (or WSL) terminal you build in: the
+Windows installer and its MSYS window are separate, and the build doesn't see them.
 ```
+wget https://apt.devkitpro.org/install-devkitpro-pacman
+chmod +x ./install-devkitpro-pacman
+sudo ln -sf /proc/self/mounts /etc/mtab      # WSL only: devkitPro's installer needs it there
+sudo ./install-devkitpro-pacman
 sudo dkp-pacman -S 3ds-dev
 ```
-and open a new terminal (that sets `DEVKITPRO` and `DEVKITARM`).
+and open a new terminal (that sets `DEVKITPRO` and `DEVKITARM`). `dkp-pacman` only exists after the installer has run:
+*command not found* means that step is missing. (More in [devkitPro's Getting Started](https://devkitpro.org/wiki/Getting_Started).)
 
 For the `.cia` (the installable version) you also need **makerom**
 ([Project_CTR releases](https://github.com/3DSGuy/Project_CTR/releases)) and **bannertool**
