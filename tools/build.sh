@@ -100,7 +100,8 @@ step_check() {
   for m in numpy:numpy PIL:Pillow yaml:PyYAML cryptography:cryptography; do
     "$PY" -c "import ${m%%:*}" 2>/dev/null && ok "Python package ${m#*:}" || no "Python package ${m#*:}" "$PY -m pip install ${m#*:}"
   done
-  command -v ffmpeg >/dev/null && ok "ffmpeg" || no "ffmpeg" "install ffmpeg (sound and music)"
+  # (the snap ffmpeg isn't on WSL's PATH and can't read Windows drives: the apt one, issue #9)
+  command -v ffmpeg >/dev/null && ok "ffmpeg" || no "ffmpeg" "sudo apt update && sudo apt install ffmpeg (sound and music; not the snap)"
   say "Checking the exports in $HKDATA"
   for d in ex/Scenes ex/GameObject ex/MonoBehaviour ex/Texture2D ex/Sprite ex/AudioClip ex/Font ex/Resources/languages \
            hs/Texture2D Assembly-CSharp; do

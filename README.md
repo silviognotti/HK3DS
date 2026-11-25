@@ -48,8 +48,11 @@ on Windows, use WSL.
 ### 1. Install the tools
 On Ubuntu or Debian (or Ubuntu in WSL on Windows):
 ```
+sudo apt update
 sudo apt install git python3 python3-numpy python3-pil python3-yaml python3-cryptography ffmpeg
 ```
+(On a new WSL install, `apt install` says *Unable to locate package* until `sudo apt update` has run. Use the apt
+ffmpeg, not the snap one: the snap version isn't found by the build in WSL and can't read the Windows drives.)
 Then **devkitPro**, which compiles 3DS programs: follow [devkitPro's Getting Started](https://devkitpro.org/wiki/Getting_Started)
 to install its package manager, then run
 ```
