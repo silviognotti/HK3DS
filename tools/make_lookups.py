@@ -71,6 +71,9 @@ ATMOS_NAMED = {
     'rainyoutdoors': 'ruins_rain_outdoor_loop',
     'greenpath': 'green_path_atmos_loop', 'greenpathinterior': 'green_path_atmos_loop', 'queensgardens': 'green_path_atmos_loop',
     'fungus': 'fungal_wastes_atmos_loop',       # the game's own name for the Fungal Wastes (Fungus2_ rooms), #6
+    # the two the name matching got wrong in the first build from another export (#6): with these the 22 cues get
+    # exactly the loops of the repository's table
+    'miscwind': 'cave_atmos_misc_3', 'waterwaysflowing': 'waterway_waterfall_medium',
     'none': 'none', 'silent': 'none',
 }
 def atmos_loop(name, loops):
