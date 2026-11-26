@@ -70,6 +70,7 @@ ATMOS_NAMED = {
     'rainyindoors': 'ruins_rain_indoor_loop', 'distantrain': 'ruins_rain_indoor_loop',
     'rainyoutdoors': 'ruins_rain_outdoor_loop',
     'greenpath': 'green_path_atmos_loop', 'greenpathinterior': 'green_path_atmos_loop', 'queensgardens': 'green_path_atmos_loop',
+    'fungus': 'fungal_wastes_atmos_loop',       # the game's own name for the Fungal Wastes (Fungus2_ rooms), #6
     'none': 'none', 'silent': 'none',
 }
 def atmos_loop(name, loops):
@@ -82,6 +83,9 @@ def atmos_loop(name, loops):
     for l in loops:                                 # most letters of the cue's words in the loop's name
         s = sum(len(w) for w in words if w in norm(l))
         if s > score: best, score = l, s
+    if not best:                                    # else a word sharing its first 4 letters with one of the loop's
+        for l in loops:
+            if any(w[:4] == lw[:4] for w in words if len(w) >= 4 for lw in re.findall(r'[a-z]+', l.lower())): return l
     return best
 
 def atmos():
